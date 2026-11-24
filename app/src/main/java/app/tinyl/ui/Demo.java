@@ -1,11 +1,11 @@
-package com.spotifast.mobile.ui;
+package app.tinyl.ui;
 
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 
-import com.spotifast.mobile.Prefs;
-import com.spotifast.mobile.engine.EngineState;
-import com.spotifast.mobile.web.WebApi;
+import app.tinyl.Prefs;
+import app.tinyl.engine.EngineState;
+import app.tinyl.web.WebApi;
 
 import org.json.JSONObject;
 
@@ -13,9 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Modo demo para revisar el diseño sin cuenta de Spotify (como `--demo` de Spotifast).
+ * Modo demo para revisar el diseño sin cuenta de Spotify (como `--demo` del Spotifast de escritorio).
  * Solo en builds depurables:
- * {@code adb shell am start -n com.spotifast.mobile/.ui.MainActivity --es demo home|search|library|playlist|playing}
+ * {@code adb shell am start -n app.tinyl/.ui.MainActivity --es demo home|search|library|playlist|playing}
  */
 final class Demo {
 
@@ -36,7 +36,7 @@ final class Demo {
         EngineState s = EngineState.get();
         try {
             s.onEngineEvent("auth_state", new JSONObject(
-                    "{\"logged_in\":true,\"is_active\":true,\"device_name\":\"Spotifast demo\"}"));
+                    "{\"logged_in\":true,\"is_active\":true,\"device_name\":\"Tinyl demo\"}"));
             s.onEngineEvent("session_info", new JSONObject("{\"username\":\"demo\"}"));
             s.onEngineEvent("track_changed", new JSONObject("{\"item\":{\"uri\":\"spotify:track:demo1\","
                     + "\"entity_type\":\"track\",\"decorations\":{\"identity\":{\"name\":\"A Toda Hora\"},"
@@ -93,7 +93,7 @@ final class Demo {
             browser.showStatic(Browser.greeting(), null, home, true, true);
         }
         if ("playing".equals(mode)) {
-            a.findViewById(com.spotifast.mobile.R.id.mini).performClick();
+            a.findViewById(app.tinyl.R.id.mini).performClick();
         }
     }
 }

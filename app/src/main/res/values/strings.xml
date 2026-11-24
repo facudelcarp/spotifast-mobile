@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Spotifast</string>
+    <string name="app_name" translatable="false">Tinyl</string>
+    <string name="tagline">cliente liviano para Spotify</string>
     <string name="settings">Ajustes</string>
     <string name="channel_playback">Reproducción</string>
     <string name="play">Reproducir</string>
@@ -25,7 +26,7 @@
     <string name="pair_cancel">Cancelar</string>
     <string name="pair_info">En otro celular, tablet o PC conectado a la misma Wi-Fi: abrí Spotify → Dispositivos → elegí «%1$s».\nSolo hace falta una vez.</string>
     <string name="web_api">Búsqueda y biblioteca (tu app de Spotify)</string>
-    <string name="web_api_help">Como en Spotifast: con tu propia app Spotify no te corta por \"demasiados pedidos\" (429).\n1. Abrí el panel de desarrolladores y tocá Create app (la cuenta necesita Premium).\n2. Redirect URI: %1$s\n3. Tildá Web API y guardá.\n4. Copiá el Client ID acá y tocá Autorizar.</string>
+    <string name="web_api_help">Con tu propia app de Spotify, Spotify no te corta por \"demasiados pedidos\" (429).\n1. Abrí el panel de desarrolladores y tocá Create app (la cuenta necesita Premium).\n2. Redirect URI: %1$s\n3. Tildá Web API y guardá.\n4. Copiá el Client ID acá y tocá Autorizar.</string>
     <string name="web_api_dashboard">Abrir panel de Spotify for Developers</string>
     <string name="web_api_client_id">Client ID</string>
     <string name="web_api_authorize">Autorizar</string>

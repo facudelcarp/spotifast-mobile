@@ -1,4 +1,4 @@
-package com.spotifast.mobile.web;
+package app.tinyl.web;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

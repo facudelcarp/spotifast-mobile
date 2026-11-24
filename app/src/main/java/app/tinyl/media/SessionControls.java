@@ -1,4 +1,4 @@
-package com.spotifast.mobile.media;
+package app.tinyl.media;
 
 import android.annotation.TargetApi;
 import android.app.Notification;
@@ -11,9 +11,9 @@ import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
 
-import com.spotifast.mobile.engine.EngineState;
-import com.spotifast.mobile.engine.NativeEngine;
-import com.spotifast.mobile.ui.MainActivity;
+import app.tinyl.engine.EngineState;
+import app.tinyl.engine.NativeEngine;
+import app.tinyl.ui.MainActivity;
 
 /** Android 5.0+: MediaSession + Notification.MediaStyle. */
 @TargetApi(21)
@@ -22,7 +22,7 @@ final class SessionControls extends MediaControls {
     private final MediaSession session;
 
     SessionControls(Context c) {
-        session = new MediaSession(c, "Spotifast");
+        session = new MediaSession(c, "Tinyl");
         session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
         session.setCallback(new MediaSession.Callback() {
             @Override

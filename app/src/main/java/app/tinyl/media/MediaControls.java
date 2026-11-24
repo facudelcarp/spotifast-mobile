@@ -1,11 +1,11 @@
-package com.spotifast.mobile.media;
+package app.tinyl.media;
 
 import android.app.Notification;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Build;
 
-import com.spotifast.mobile.engine.EngineState;
+import app.tinyl.engine.EngineState;
 
 /**
  * Controles del sistema (pantalla bloqueada, auriculares, notificación).

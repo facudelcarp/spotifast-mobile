@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo Tinyl: vinilo chiquito con surcos y etiqueta con ▶ (capa delantera del ícono adaptativo) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF0A0D0B" android:pathData="M54,23a31,31 0 1,0 0.01,0Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF26302B" android:strokeWidth="1.3"
+        android:pathData="M54,26.5a27.5,27.5 0 1,0 0.01,0Z M54,30a24,24 0 1,0 0.01,0Z M54,33.5a20.5,20.5 0 1,0 0.01,0Z M54,37a17,17 0 1,0 0.01,0Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#38FFFFFF" android:strokeWidth="2.6"
+        android:strokeLineCap="round" android:pathData="M32.5,44A23.5,23.5 0 0,1 44,31.5" />
+    <path android:fillColor="#00000000" android:strokeColor="#1AFFFFFF" android:strokeWidth="2.6"
+        android:strokeLineCap="round" android:pathData="M75.5,64A23.5,23.5 0 0,1 64,76.5" />
+    <path android:fillColor="#FF1ED760" android:pathData="M54,42a12,12 0 1,0 0.01,0Z" />
+    <path android:fillColor="#FF0A0D0B" android:pathData="M50.6,48.2L50.6,59.8L60.4,54Z" />
+</vector>

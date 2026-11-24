@@ -1,4 +1,4 @@
-package com.spotifast.mobile.engine;
+package app.tinyl.engine;
 
 import android.media.AudioFormat;
 import android.media.AudioManager;

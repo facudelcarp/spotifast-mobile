@@ -1,4 +1,4 @@
-package com.spotifast.mobile;
+package app.tinyl;
 
 import android.content.Context;
 import android.content.Intent;
@@ -7,8 +7,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
 
-import com.spotifast.mobile.engine.NativeEngine;
-import com.spotifast.mobile.web.OAuthTokens;
+import app.tinyl.engine.NativeEngine;
+import app.tinyl.web.OAuthTokens;
 
 import org.json.JSONObject;
 
@@ -146,7 +146,7 @@ public final class SpotifyAuth {
                     closeServer();
                 }
             }
-        }, "spotifast-oauth").start();
+        }, "tinyl-oauth").start();
 
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -169,8 +169,8 @@ public final class SpotifyAuth {
                 String err = u.getQueryParameter("error");
                 boolean ok = code != null && expectedState.equals(u.getQueryParameter("state"));
                 respond(s, 200, ok
-                        ? "<h2>Listo</h2><p>Ya podés volver a Spotifast.</p>"
-                          + "<p><a href=\"spotifast://login\">Abrir Spotifast</a></p>"
+                        ? "<h2>Listo</h2><p>Ya podés volver a Tinyl.</p>"
+                          + "<p><a href=\"tinyl://login\">Abrir Tinyl</a></p>"
                         : "<h2>Error</h2><p>" + (err == null ? "respuesta inválida" : err) + "</p>");
                 if (!ok) {
                     throw new Exception("Login cancelado o inválido" + (err == null ? "" : ": " + err));

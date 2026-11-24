@@ -56,6 +56,8 @@ jobs:
             native/target
           key: cargo-${{ hashFiles('native/Cargo.lock') }}
 
+      # Los secrets conservan el prefijo SPOTIFAST_ (nombre anterior del proyecto) para no
+      # tener que cargarlos de nuevo.
       - name: Keystore de firma
         env:
           KEYSTORE_BASE64: ${{ secrets.SPOTIFAST_KEYSTORE_BASE64 }}
@@ -64,8 +66,8 @@ jobs:
             echo "::error::Falta el secret SPOTIFAST_KEYSTORE_BASE64. Sin keystore propio cada release se firmaría distinto y no se podría actualizar encima. Ver README → Release."
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/spotifast.jks"
-          echo "SPOTIFAST_KEYSTORE=$RUNNER_TEMP/spotifast.jks" >> "$GITHUB_ENV"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tinyl.jks"
+          echo "SPOTIFAST_KEYSTORE=$RUNNER_TEMP/tinyl.jks" >> "$GITHUB_ENV"
 
       - name: Compilar APKs firmados
         env:
@@ -80,10 +82,10 @@ jobs:
           mkdir -p dist
           for f in app/build/outputs/apk/release/app-*-release.apk; do
             abi=$(basename "$f" | sed -e 's/^app-//' -e 's/-release\.apk$//')
-            cp "$f" "dist/spotifast-$V-$abi.apk"
+            cp "$f" "dist/tinyl-$V-$abi.apk"
           done
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs "dist/spotifast-$V-universal.apk" | head -3
+          "$BT/apksigner" verify --print-certs "dist/tinyl-$V-universal.apk" | head -3
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
           ls -la dist
 
@@ -91,7 +93,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: Spotifast Mobile v${{ steps.ver.outputs.version }}
+          name: Tinyl v${{ steps.ver.outputs.version }}
           body_path: .github/release-notes.md
           files: |
             dist/*.apk

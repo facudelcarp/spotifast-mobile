@@ -19,11 +19,11 @@ def keystorePath = System.getenv("SPOTIFAST_KEYSTORE")
 def hasReleaseKey = keystorePath != null && file(keystorePath).exists()
 
 android {
-    namespace "com.spotifast.mobile"
+    namespace "app.tinyl"
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.spotifast.mobile"
+        applicationId "app.tinyl"
         // Android 4.4 KitKat (2013). Los íconos vectoriales se convierten a PNG al compilar.
         minSdk 19
         targetSdk 35
@@ -80,7 +80,7 @@ android {
 }
 
 // ---- Motor nativo (Rust + librespot) ------------------------------------------------------
-// Compila native/ con cargo-ndk y deja libspotifast.so en src/main/jniLibs.
+// Compila native/ con cargo-ndk y deja libtinyl.so en src/main/jniLibs.
 // Saltear con -PskipRust si las .so ya están compiladas (p. ej. en un paso previo de CI).
 // Los ABIs de 32 bits se compilan para API 19 (Android 4.4); los de 64 bits empiezan en API 21.
 // x86 cubre teléfonos Intel Atom de la época de KitKat (p. ej. ASUS Zenfone 4/5).

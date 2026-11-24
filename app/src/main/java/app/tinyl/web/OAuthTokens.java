@@ -1,10 +1,10 @@
-package com.spotifast.mobile.web;
+package app.tinyl.web;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import com.spotifast.mobile.SpotifyAuth;
-import com.spotifast.mobile.engine.NativeEngine;
+import app.tinyl.SpotifyAuth;
+import app.tinyl.engine.NativeEngine;
 
 import org.json.JSONObject;
 

@@ -1,12 +1,12 @@
 [package]
-name = "spotifast-engine"
+name = "tinyl-engine"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Motor de reproducción de Spotifast Mobile: librespot + puente JNI con protocolo estilo Soloist"
+description = "Motor de reproducción de Tinyl: librespot + puente JNI con protocolo estilo Soloist"
 
 [lib]
-name = "spotifast"
+name = "tinyl"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -38,6 +38,6 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
-# librespot-core parcheado (ver vendor/librespot-core/src/config.rs, "SPOTIFAST PATCH").
+# librespot-core parcheado (ver vendor/librespot-core/src/config.rs, "TINYL PATCH").
 [patch.crates-io]
 librespot-core = { path = "vendor/librespot-core" }

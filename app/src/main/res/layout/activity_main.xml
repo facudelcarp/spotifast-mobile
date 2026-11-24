@@ -23,13 +23,19 @@
             android:paddingStart="16dp"
             android:paddingEnd="4dp">
 
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_launcher" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="SPOTIFAST"
-                android:textColor="@color/accent"
-                android:textSize="19sp"
+                android:layout_marginStart="8dp"
+                android:text="@string/app_name"
+                android:textColor="@color/text"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -470,7 +476,7 @@
                 android:background="@drawable/thumb_bg"
                 android:scaleType="centerCrop" />
 
-            <!-- Display LCD: el sello retro de Spotifast -->
+            <!-- Display LCD: el sello retro de Tinyl -->
             <LinearLayout
                 android:id="@+id/lcd"
                 android:layout_width="match_parent"

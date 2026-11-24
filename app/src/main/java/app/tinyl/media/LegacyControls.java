@@ -1,4 +1,4 @@
-package com.spotifast.mobile.media;
+package app.tinyl.media;
 
 import android.annotation.SuppressLint;
 import android.app.Notification;
@@ -11,8 +11,8 @@ import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.RemoteControlClient;
 
-import com.spotifast.mobile.MediaButtonReceiver;
-import com.spotifast.mobile.engine.EngineState;
+import app.tinyl.MediaButtonReceiver;
+import app.tinyl.engine.EngineState;
 
 /** Android 4.4: RemoteControlClient (controles en la pantalla bloqueada) + botones de auriculares. */
 @SuppressWarnings("deprecation")

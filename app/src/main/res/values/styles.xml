@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Android 4.4: base Holo oscura. En values-v21 se reemplaza por Material. -->
-    <style name="Theme.Spotifast" parent="android:Theme.Holo.NoActionBar">
+    <style name="Theme.Tinyl" parent="android:Theme.Holo.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:textColorPrimary">@color/text</item>
         <item name="android:textColorSecondary">@color/muted</item>

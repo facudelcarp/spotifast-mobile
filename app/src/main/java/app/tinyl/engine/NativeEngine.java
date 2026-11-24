@@ -1,4 +1,4 @@
-package com.spotifast.mobile.engine;
+package app.tinyl.engine;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -31,7 +31,7 @@ public final class NativeEngine {
         void onResponse(int status, byte[] body, String retryAfter);
     }
 
-    private static final String TAG = "spotifast";
+    private static final String TAG = "tinyl";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final CopyOnWriteArrayList<Listener> LISTENERS = new CopyOnWriteArrayList<>();
     private static volatile AudioOut audio;
@@ -39,7 +39,7 @@ public final class NativeEngine {
     private static int nextHttpId = 1;
 
     static {
-        System.loadLibrary("spotifast");
+        System.loadLibrary("tinyl");
         nativeInit();
     }
 

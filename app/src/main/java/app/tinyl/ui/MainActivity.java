@@ -1,4 +1,4 @@
-package com.spotifast.mobile.ui;
+package app.tinyl.ui;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -17,14 +17,14 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.spotifast.mobile.PlayerService;
-import com.spotifast.mobile.Prefs;
-import com.spotifast.mobile.R;
-import com.spotifast.mobile.SpotifyAuth;
-import com.spotifast.mobile.engine.EngineState;
-import com.spotifast.mobile.engine.NativeEngine;
-import com.spotifast.mobile.web.SpotifyLinks;
-import com.spotifast.mobile.web.WebApi;
+import app.tinyl.PlayerService;
+import app.tinyl.Prefs;
+import app.tinyl.R;
+import app.tinyl.SpotifyAuth;
+import app.tinyl.engine.EngineState;
+import app.tinyl.engine.NativeEngine;
+import app.tinyl.web.SpotifyLinks;
+import app.tinyl.web.WebApi;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -693,8 +693,10 @@ public final class MainActivity extends Activity implements EngineState.Observer
             tintMini(0);
             int p = (int) (12 * getResources().getDisplayMetrics().density);
             miniCover.setPadding(p, p, p, p);
-            miniCover.setImageResource(R.drawable.ic_note);
-            miniCover.setColorFilter(getResources().getColor(R.color.panel_edge));
+            // Sin carátula: el logo de Tinyl en vez de una nota genérica.
+            miniCover.setPadding(0, 0, 0, 0);
+            miniCover.clearColorFilter();
+            miniCover.setImageResource(R.drawable.ic_launcher);
         } else if (!s.coverSmall.equals(shownMiniCover)) {
             shownMiniCover = s.coverSmall;
             miniCover.setPadding(0, 0, 0, 0);

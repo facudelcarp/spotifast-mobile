@@ -1,4 +1,4 @@
-package com.spotifast.mobile.ui;
+package app.tinyl.ui;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -15,11 +15,11 @@ import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.spotifast.mobile.PlayerService;
-import com.spotifast.mobile.Prefs;
-import com.spotifast.mobile.R;
-import com.spotifast.mobile.SpotifyAuth;
-import com.spotifast.mobile.web.OAuthTokens;
+import app.tinyl.PlayerService;
+import app.tinyl.Prefs;
+import app.tinyl.R;
+import app.tinyl.SpotifyAuth;
+import app.tinyl.web.OAuthTokens;
 
 import java.io.File;
 
@@ -81,7 +81,7 @@ public final class SettingsActivity extends Activity {
         root.addView(clear);
         final EditText idle = field(root, R.string.idle, String.valueOf(prefs.idleMinutes()), InputType.TYPE_CLASS_NUMBER);
 
-        // ---- Web API con app propia (como Spotifast): cupo propio, sin 429 de la app compartida
+        // ---- Web API con app propia: cupo propio, sin 429 de la app compartida
         label(root, R.string.web_api);
         TextView help = new TextView(this);
         help.setTextSize(12);
@@ -158,7 +158,7 @@ public final class SettingsActivity extends Activity {
             public void onClick(View v) {
                 stopService(new Intent(SettingsActivity.this, PlayerService.class));
                 new File(getFilesDir(), "credentials.json").delete();
-                com.spotifast.mobile.web.OAuthTokens.clearAll(SettingsActivity.this);
+                app.tinyl.web.OAuthTokens.clearAll(SettingsActivity.this);
                 finish();
             }
         });
@@ -167,9 +167,9 @@ public final class SettingsActivity extends Activity {
         TextView about = new TextView(this);
         about.setPadding(0, pad, 0, 0);
         about.setTextSize(11);
-        about.setText("Motor: librespot (código abierto) dentro de la app. Protocolo de control "
-                + "compatible con Spotify Soloist. Web API con app propia, como Spotifast. "
-                + "No afiliado a Spotify.");
+        about.setText("Tinyl · cliente liviano para Spotify. Requiere Spotify Premium.\n"
+                + "Motor: librespot (código abierto). Protocolo de control compatible con Spotify Soloist. "
+                + "Inspirado en Spotifast. No afiliado a Spotify AB.");
         root.addView(about);
 
         ScrollView sv = new ScrollView(this);

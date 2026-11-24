@@ -11,7 +11,7 @@ pub(crate) const IOS_CLIENT_ID: &str = "58bd3c95768941ea9eb4350aaa033eb3";
 // android or ios needs to be mocked, the `os_version` has to be set to a valid version.
 // Otherwise, client-token or login5 requests will fail with a generic invalid-credential error.
 /// See [std::env::consts::OS]
-// SPOTIFAST PATCH: en Android nos identificamos como escritorio Linux. librespot en modo
+// TINYL PATCH: en Android nos identificamos como escritorio Linux. librespot en modo
 // "android" imita a la app oficial (client ID y versión móviles) y Spotify rechaza el login
 // con un token OAuth del client ID de escritorio ("Login request was denied: BAD_REQUEST").
 #[cfg(target_os = "android")]

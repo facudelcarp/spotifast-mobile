@@ -2,7 +2,7 @@
 
 ## v0.6.0
 
-Primera versión publicada.
+Primera versión publicada, como **Tinyl · cliente liviano para Spotify** (antes "Spotifast Mobile").
 
 **Reproducción**
 - Motor librespot nativo dentro del APK: sin PC, sin la app oficial y sin apps auxiliares.
@@ -24,4 +24,6 @@ Primera versión publicada.
 - Android 4.4 en adelante; ARM y x86, 32 y 64 bits.
 - ~34 MB de RAM en uso; APK de ~3 MB por procesador.
 - Login por navegador o desde otro dispositivo (Spotify Connect) para equipos viejos.
-- Web API con app propia del usuario, como Spotifast (sin 429 del client ID compartido).
+- Web API con app propia del usuario (sin 429 del client ID compartido).
+- Logo propio (vinilo chiquito con ▶), ícono adaptativo y temático, y marca Tinyl en la notificación
+  y la pantalla bloqueada cuando no hay carátula.
