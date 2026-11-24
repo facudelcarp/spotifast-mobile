@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings">Settings</string>
+    <string name="channel_playback">Playback</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="next">Next</string>
+    <string name="prev">Previous</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="repeat">Repeat</string>
+    <string name="library">Library</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Search or paste a Spotify link</string>
+    <string name="login">Log in with Spotify</string>
+    <string name="login_note">Requires Spotify Premium. The browser opens once; the phone remembers the session.</string>
+    <string name="logout">Log out</string>
+    <string name="device_name">Device name</string>
+    <string name="quality">Audio quality</string>
+    <string name="eco">Saver mode (no artwork)</string>
+    <string name="cache">Audio cache (MB, 0 = unlimited)</string>
+    <string name="idle">Stop engine after N minutes paused</string>
+    <string name="save">Save</string>
+</resources>

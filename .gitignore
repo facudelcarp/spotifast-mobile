@@ -7,3 +7,6 @@ captures/
 *.apk
 *.keystore
 *.jks
+# Librerías nativas: las genera la tarea cargoBuild (native/)
+app/src/main/jniLibs/
+native/target/
