@@ -75,7 +75,8 @@ public final class SpotifyAuth {
         /** Web API con la app propia del usuario (mismos permisos de lectura que Spotifast). */
         public static Grant personal(String clientId) {
             return new Grant(clientId.trim(), 8989, "user-read-private playlist-read-private "
-                    + "playlist-read-collaborative user-library-read user-library-modify "
+                    + "playlist-read-collaborative playlist-modify-private playlist-modify-public "
+                    + "user-library-read user-library-modify "
                     + "user-follow-read user-read-recently-played user-top-read "
                     + "user-read-playback-state user-modify-playback-state",
                     OAuthTokens.PERSONAL);

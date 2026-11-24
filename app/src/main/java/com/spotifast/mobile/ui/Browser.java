@@ -41,6 +41,10 @@ final class Browser {
         boolean loading;
         String error;
         int scroll;
+        /** Inicio: los atajos del principio se muestran en grilla de 2 columnas. */
+        boolean grid;
+        /** Filas fijas al principio (no cuentan como "ya cargado"). */
+        int fixed;
 
         Page(String title, String contextUri, Loader loader) {
             this.title = title;
@@ -54,6 +58,10 @@ final class Browser {
     private static final String SHUFFLE_ALL = "shuffle_all";
     private static final String MORE = "more";
     private static final String NAV = "nav";
+    private static final String LIKED = "liked";
+    private static final String QUERY = "query";
+    private static final String CLEAR_HISTORY = "clear_history";
+    private static final String PAIR = "pair";
 
     private final Activity activity;
     private final ListView list;
@@ -96,8 +104,43 @@ final class Browser {
 
     // ================================================================ pantallas raíz
 
+    /** Inicio: saludo + atajos a lo último que escuchaste + canciones recientes. */
+    void showHome() {
+        Page p = new Page(greeting(), null, new Loader() {
+            @Override
+            public void load(WebApi api, WebApi.Result r) {
+                api.home(EngineState.get().username, r);
+            }
+        });
+        p.grid = true;
+        root(p);
+    }
+
+    static String greeting() {
+        int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        return h >= 5 && h < 12 ? "Buenos días" : h >= 12 && h < 20 ? "Buenas tardes" : "Buenas noches";
+    }
+
+    /** Buscar: búsquedas recientes (guardadas en el teléfono, cero red). */
+    void showSearchRoot() {
+        Page p = new Page("Buscar", null, null);
+        List<String> history = prefs.searchHistory();
+        if (!history.isEmpty()) {
+            p.items.add(WebApi.Item.header("Búsquedas recientes"));
+            for (String q : history) {
+                p.items.add(WebApi.Item.make(q, q, "", QUERY));
+            }
+            p.items.add(WebApi.Item.make("", "Borrar búsquedas recientes", "", CLEAR_HISTORY));
+        }
+        root(p);
+    }
+
     void showSearch(final String query) {
-        root(new Page("Resultados: " + query, null, new Loader() {
+        prefs.addSearch(query);
+        if (stack.size() > 1) {
+            stack.subList(1, stack.size()).clear(); // una búsqueda nueva reemplaza a la anterior
+        }
+        push(new Page(query, null, new Loader() {
             @Override
             public void load(WebApi api, WebApi.Result r) {
                 api.search(query, r);
@@ -105,18 +148,40 @@ final class Browser {
         }));
     }
 
-    void showLibrary() {
-        Page p = new Page("Biblioteca", null, null);
-        p.items.add(nav("Tus me gusta", "liked", "Canciones guardadas"));
-        p.items.add(nav("Playlists", "playlists", "Tuyas y seguidas"));
-        p.items.add(nav("Álbumes", "albums", "Guardados"));
-        p.items.add(nav("Artistas", "artists", "Que seguís"));
-        p.items.add(nav("Escuchado recientemente", "recent", "Últimas 50"));
+    /** Biblioteca filtrada por chip: playlists (con Tus me gusta arriba), álbumes o artistas. */
+    void showLibrary(final String filter) {
+        Page p;
+        if ("albums".equals(filter)) {
+            p = new Page("Tu biblioteca", null, new Loader() {
+                @Override
+                public void load(WebApi api, WebApi.Result r) {
+                    api.savedAlbums(r);
+                }
+            });
+        } else if ("artists".equals(filter)) {
+            p = new Page("Tu biblioteca", null, new Loader() {
+                @Override
+                public void load(WebApi api, WebApi.Result r) {
+                    api.followedArtists(r);
+                }
+            });
+        } else {
+            p = new Page("Tu biblioteca", null, new Loader() {
+                @Override
+                public void load(WebApi api, WebApi.Result r) {
+                    api.myPlaylists(r);
+                }
+            });
+            p.items.add(WebApi.Item.make("liked", "Tus me gusta", "Playlist · canciones guardadas", LIKED));
+            p.items.add(nav("Escuchado recientemente", "recent", "Últimas 50"));
+            p.fixed = 2;
+        }
         root(p);
     }
 
+    /** Cola, abierta desde "Sonando". */
     void showQueue() {
-        root(new Page("Cola", null, new Loader() {
+        push(new Page("Cola", null, new Loader() {
             @Override
             public void load(WebApi api, WebApi.Result r) {
                 api.queue(r);
@@ -126,7 +191,12 @@ final class Browser {
 
     /** Pantalla con filas ya armadas (modo demo para capturas). */
     void showStatic(String title, String contextUri, List<WebApi.Item> items, boolean asRoot) {
+        showStatic(title, contextUri, items, asRoot, false);
+    }
+
+    void showStatic(String title, String contextUri, List<WebApi.Item> items, boolean asRoot, boolean grid) {
         Page p = new Page(title, contextUri, null);
+        p.grid = grid;
         p.items.addAll(items);
         if (asRoot) {
             root(p);
@@ -162,7 +232,7 @@ final class Browser {
             top().scroll = list.getFirstVisiblePosition();
         }
         stack.add(p);
-        if (p.loader != null && p.items.isEmpty()) {
+        if (p.loader != null && p.items.size() <= p.fixed) {
             load(p);
         }
         render();
@@ -196,7 +266,7 @@ final class Browser {
                 }
             }
         };
-        if (p.items.isEmpty() || p.next == null) {
+        if (p.items.size() <= p.fixed || p.next == null) {
             p.loader.load(api, r);
         } else {
             api.page(p.next, r);
@@ -294,6 +364,19 @@ final class Browser {
             case NAV:
                 openLibrarySection(it.uri);
                 return;
+            case LIKED:
+                openLibrarySection("liked");
+                return;
+            case QUERY:
+                if (listener != null) {
+                    listener.onSearchAgain(it.uri);
+                }
+                showSearch(it.uri);
+                return;
+            case CLEAR_HISTORY:
+                prefs.clearSearches();
+                showSearchRoot();
+                return;
             case MORE:
                 load(p);
                 render();
@@ -323,7 +406,8 @@ final class Browser {
     }
 
     private boolean onLongClick(final WebApi.Item it) {
-        if (it.isHeader() || NAV.equals(it.kind) || MORE.equals(it.kind)
+        if (it.isHeader() || NAV.equals(it.kind) || MORE.equals(it.kind) || LIKED.equals(it.kind)
+                || QUERY.equals(it.kind) || CLEAR_HISTORY.equals(it.kind)
                 || PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind)) {
             return false;
         }
@@ -343,6 +427,15 @@ final class Browser {
                 @Override
                 public void run() {
                     play(it.uri, null);
+                }
+            });
+        }
+        if (it.isPlayable()) {
+            labels.add("Agregar a una playlist");
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    pickPlaylist(it);
                 }
             });
         }
@@ -390,6 +483,55 @@ final class Browser {
         return true;
     }
 
+    /** Elegir una de tus playlists y agregarle la canción. */
+    private void pickPlaylist(final WebApi.Item track) {
+        api.myOwnedPlaylists(EngineState.get().username, new WebApi.Result() {
+            @Override
+            public void onItems(final List<WebApi.Item> lists, String next) {
+                if (lists.isEmpty()) {
+                    Toast.makeText(activity, "No tenés playlists propias: creá una con Crear",
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String[] names = new String[lists.size()];
+                for (int i = 0; i < names.length; i++) {
+                    names[i] = lists.get(i).title;
+                }
+                new AlertDialog.Builder(activity)
+                        .setTitle("Agregar a una playlist")
+                        .setItems(names, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface d, int which) {
+                                api.addToPlaylist(lists.get(which).uri, track.uri,
+                                        toast("Agregada a " + lists.get(which).title));
+                            }
+                        })
+                        .show();
+            }
+
+            @Override
+            public void onError(String message) {
+                Toast.makeText(activity, message, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    /** Abrir una playlist (p. ej. recién creada con "Crear"). */
+    void openPlaylist(WebApi.Item playlist) {
+        open(playlist);
+    }
+
+    /** Avisos hacia MainActivity (rellenar el buscador al tocar una búsqueda reciente). */
+    interface Listener {
+        void onSearchAgain(String query);
+    }
+
+    private Listener listener;
+
+    void setListener(Listener l) {
+        listener = l;
+    }
+
     /** Abrir el álbum/artista de la canción que está sonando (desde el reproductor). */
     void openNowPlaying(final boolean artist) {
         final EngineState s = EngineState.get();
@@ -425,6 +567,7 @@ final class Browser {
         if (uri == null) {
             return;
         }
+        EngineState.get().contextUri = uri;
         if (offsetUri != null) {
             NativeEngine.command("play", "uri", uri, "offset_uri", offsetUri);
         } else {
@@ -451,7 +594,20 @@ final class Browser {
             rows.add(WebApi.Item.make("", "Reproducir", "", PLAY_ALL));
             rows.add(WebApi.Item.make("", "Aleatorio", "", SHUFFLE_ALL));
         }
-        rows.addAll(p.items);
+        if (p.grid) {
+            // Atajos (todo lo que está antes del primer encabezado) en filas de a dos.
+            int i = 0;
+            while (i < p.items.size() && !p.items.get(i).isHeader()) {
+                WebApi.Item pair = WebApi.Item.make("", "", "", PAIR);
+                pair.left = p.items.get(i);
+                pair.right = i + 1 < p.items.size() && !p.items.get(i + 1).isHeader() ? p.items.get(i + 1) : null;
+                rows.add(pair);
+                i += pair.right == null ? 1 : 2;
+            }
+            rows.addAll(p.items.subList(i, p.items.size()));
+        } else {
+            rows.addAll(p.items);
+        }
         if (p.next != null && !p.loading) {
             rows.add(WebApi.Item.make("", "Cargar más…", "", MORE));
         }
@@ -460,7 +616,7 @@ final class Browser {
             empty.setText("Cargando…");
         } else if (p.error != null) {
             empty.setText("Error: " + p.error);
-        } else if (p.items.isEmpty() && p.loader != null) {
+        } else if (p.items.size() <= p.fixed && p.loader != null && !p.loading) {
             empty.setText("Nada por acá");
         } else {
             empty.setText("");
@@ -493,17 +649,19 @@ final class Browser {
 
         @Override
         public int getViewTypeCount() {
-            return 2;
+            return 3;
         }
 
         @Override
         public int getItemViewType(int i) {
-            return rows.get(i).isHeader() ? 1 : 0;
+            WebApi.Item it = rows.get(i);
+            return it.isHeader() ? 1 : PAIR.equals(it.kind) ? 2 : 0;
         }
 
         @Override
         public boolean isEnabled(int i) {
-            return !rows.get(i).isHeader();
+            WebApi.Item it = rows.get(i);
+            return !it.isHeader() && !PAIR.equals(it.kind); // las celdas manejan su propio toque
         }
 
         @Override
@@ -513,7 +671,15 @@ final class Browser {
                 if (v == null) {
                     v = activity.getLayoutInflater().inflate(R.layout.item_header, parent, false);
                 }
-                ((TextView) v).setText(it.title.toUpperCase());
+                ((TextView) v).setText(it.title);
+                return v;
+            }
+            if (PAIR.equals(it.kind)) {
+                if (v == null) {
+                    v = activity.getLayoutInflater().inflate(R.layout.item_pair, parent, false);
+                }
+                bindCell(v.findViewById(R.id.cell_a), it.left);
+                bindCell(v.findViewById(R.id.cell_b), it.right);
                 return v;
             }
             if (v == null) {
@@ -523,16 +689,43 @@ final class Browser {
             TextView t2 = (TextView) v.findViewById(android.R.id.text2);
             android.widget.ImageView icon = (android.widget.ImageView) v.findViewById(android.R.id.icon);
             t1.setText(it.title);
-            boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind) || MORE.equals(it.kind);
+            boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind) || MORE.equals(it.kind)
+                    || CLEAR_HISTORY.equals(it.kind);
             boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().uri);
             t1.setTextColor(activity.getResources().getColor(
                     special || current ? R.color.accent : R.color.text));
-            t1.setTypeface(null, special || NAV.equals(it.kind) ? android.graphics.Typeface.BOLD
+            t1.setTypeface(null, special || NAV.equals(it.kind) || LIKED.equals(it.kind)
+                    ? android.graphics.Typeface.BOLD
                     : android.graphics.Typeface.NORMAL);
             t2.setText(it.subtitle);
             t2.setVisibility(it.subtitle.length() == 0 ? View.GONE : View.VISIBLE);
             bindIcon(icon, it);
             return v;
+        }
+
+        private void bindCell(View cell, final WebApi.Item it) {
+            if (it == null) {
+                cell.setVisibility(View.INVISIBLE);
+                return;
+            }
+            cell.setVisibility(View.VISIBLE);
+            TextView t = (TextView) cell.findViewById(android.R.id.text1);
+            t.setText(it.title);
+            boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().contextUri);
+            t.setTextColor(activity.getResources().getColor(current ? R.color.accent : R.color.text));
+            bindIcon((android.widget.ImageView) cell.findViewById(android.R.id.icon), it);
+            cell.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Browser.this.onClick(it);
+                }
+            });
+            cell.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    return Browser.this.onLongClick(it);
+                }
+            });
         }
 
         /** Miniatura de la API, o un ícono si es una fila de navegación/acción. */
@@ -542,6 +735,18 @@ final class Browser {
             int bg = R.drawable.thumb_bg;
             int tint = R.color.muted;
             switch (it.kind) {
+                case LIKED:
+                    pad = dp(13);
+                    res = R.drawable.ic_heart;
+                    bg = R.drawable.liked_tile;
+                    tint = R.color.text;
+                    break;
+                case QUERY:
+                case CLEAR_HISTORY:
+                    pad = dp(13);
+                    res = CLEAR_HISTORY.equals(it.kind) ? R.drawable.ic_close : R.drawable.ic_history;
+                    bg = 0;
+                    break;
                 case NAV:
                     pad = dp(12);
                     switch (it.uri) {
@@ -580,7 +785,11 @@ final class Browser {
                 default:
             }
             icon.setVisibility(View.VISIBLE);
-            icon.setBackgroundResource(bg);
+            if (bg == 0) {
+                icon.setBackgroundDrawable(null);
+            } else {
+                icon.setBackgroundResource(bg);
+            }
             icon.setPadding(pad, pad, pad, pad);
             if (res != 0) {
                 icon.setTag(null);

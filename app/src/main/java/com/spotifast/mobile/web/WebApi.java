@@ -31,6 +31,10 @@ public final class WebApi implements NativeEngine.Listener {
         public String artistUri;
         /** Miniatura chica (~64 px, unos pocos KB) o null. */
         public String image;
+        /** Para filas dobles (grilla de Inicio): las dos celdas. */
+        public Item left, right;
+        /** Dueño (playlists): para ofrecer solo las propias en "Agregar a playlist". */
+        public String ownerId;
 
         Item(String uri, String title, String subtitle, String kind) {
             this.uri = uri;
@@ -293,7 +297,193 @@ public final class WebApi implements NativeEngine.Listener {
         });
     }
 
+    /**
+     * Inicio, como el de Spotify pero liviano: accesos a los contextos que escuchaste hace poco
+     * (playlists, álbumes, artistas) + las últimas canciones. Un pedido al historial y, solo para
+     * playlists, uno chiquito por cada una (con {@code fields}) para conocer nombre e imagen.
+     */
+    public void home(final String username, final Result r) {
+        read("/v1/me/player/recently-played?limit=50", new Result() {
+            @Override
+            public void onItems(final List<Item> rows, String next) {
+                // rows: [atajos..., header, canciones...]; completar nombres de playlists
+                final int[] pendingCount = {0};
+                for (final Item it : rows) {
+                    if ("playlist".equals(it.kind) && it.title.length() == 0) {
+                        pendingCount[0]++;
+                        read("/v1/playlists/" + id(it.uri) + "?fields=name,images,uri,type,owner(id,display_name)",
+                                new Result() {
+                                    @Override
+                                    public void onItems(List<Item> items, String n) {
+                                        if (!items.isEmpty()) {
+                                            Item full = items.get(0);
+                                            int i = rows.indexOf(it);
+                                            if (i >= 0) {
+                                                rows.set(i, full);
+                                            }
+                                        }
+                                        done();
+                                    }
+
+                                    @Override
+                                    public void onError(String message) {
+                                        rows.remove(it);
+                                        done();
+                                    }
+
+                                    private void done() {
+                                        if (--pendingCount[0] == 0) {
+                                            r.onItems(rows, null);
+                                        }
+                                    }
+                                }, SINGLE);
+                    }
+                }
+                if (pendingCount[0] == 0) {
+                    r.onItems(rows, null);
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                r.onError(message);
+            }
+        }, new Parser() {
+            @Override
+            public String parse(JSONObject o, List<Item> out) {
+                JSONArray items = o.optJSONArray("items");
+                java.util.LinkedHashMap<String, Item> shortcuts = new java.util.LinkedHashMap<>();
+                List<Item> tracks = new ArrayList<>();
+                java.util.HashSet<String> seen = new java.util.HashSet<>();
+                if (username != null && username.length() > 0) {
+                    shortcuts.put("liked", make("spotify:user:" + username + ":collection",
+                            "Tus me gusta", "", "liked"));
+                }
+                for (int i = 0; items != null && i < items.length(); i++) {
+                    JSONObject h = items.optJSONObject(i);
+                    if (h == null) {
+                        continue;
+                    }
+                    JSONObject track = h.optJSONObject("track");
+                    Item t = item(track, "track");
+                    if (t != null && seen.add(t.uri) && tracks.size() < 15) {
+                        tracks.add(t);
+                    }
+                    JSONObject ctx = h.optJSONObject("context");
+                    String cu = ctx == null ? "" : ctx.optString("uri");
+                    if (cu.length() == 0 || shortcuts.containsKey(cu) || shortcuts.size() >= 8) {
+                        continue;
+                    }
+                    String type = ctx.optString("type");
+                    if ("album".equals(type) && track != null) {
+                        Item a = item(track.optJSONObject("album"), "album");
+                        if (a != null) {
+                            shortcuts.put(cu, a);
+                        }
+                    } else if ("playlist".equals(type)) {
+                        shortcuts.put(cu, make(cu, "", "", "playlist")); // nombre: se completa después
+                    } else if ("artist".equals(type) && t != null && cu.equals(t.artistUri)) {
+                        JSONArray ar = track.optJSONArray("artists");
+                        String n = ar == null ? "" : ar.optJSONObject(0).optString("name");
+                        Item a = make(cu, n, "Artista", "artist");
+                        shortcuts.put(cu, a);
+                    }
+                }
+                out.addAll(shortcuts.values());
+                if (!tracks.isEmpty()) {
+                    out.add(Item.header("Escuchado recientemente"));
+                    out.addAll(tracks);
+                }
+                return null;
+            }
+        });
+    }
+
+    /** Un solo objeto (playlist con fields, pista, etc.). */
+    private static final Parser SINGLE = new Parser() {
+        @Override
+        public String parse(JSONObject o, List<Item> out) {
+            Item it = item(o, null);
+            if (it != null) {
+                out.add(it);
+            }
+            return null;
+        }
+    };
+
+    private static Item make(String uri, String title, String sub, String kind) {
+        return new Item(uri, title, sub, kind);
+    }
+
+    /** Playlists que podés editar (propias), para "Agregar a una playlist". */
+    public void myOwnedPlaylists(final String username, final Result r) {
+        read("/v1/me/playlists?limit=50", new Result() {
+            @Override
+            public void onItems(List<Item> items, String next) {
+                List<Item> own = new ArrayList<>();
+                for (Item it : items) {
+                    if (username == null || username.equals(it.ownerId)) {
+                        own.add(it);
+                    }
+                }
+                r.onItems(own, null);
+            }
+
+            @Override
+            public void onError(String message) {
+                r.onError(message);
+            }
+        }, PAGE);
+    }
+
     // ================================================================ escrituras
+
+    public interface Created {
+        void onCreated(Item playlist, String error);
+    }
+
+    public void createPlaylist(String name, final Created c) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("name", name);
+            body.put("public", false);
+        } catch (Exception ignored) {
+        }
+        request("POST", "/v1/me/playlists", body.toString(), new Response() {
+            @Override
+            public void ok(byte[] data) {
+                try {
+                    c.onCreated(item(new JSONObject(new String(data, "UTF-8")), "playlist"), null);
+                } catch (Exception e) {
+                    c.onCreated(null, "respuesta inválida");
+                }
+            }
+
+            @Override
+            public void fail(String message) {
+                c.onCreated(null, message);
+            }
+        });
+    }
+
+    public void addToPlaylist(String playlistUri, String trackUri, final Done d) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("uris", new JSONArray().put(trackUri));
+        } catch (Exception ignored) {
+        }
+        request("POST", "/v1/playlists/" + id(playlistUri) + "/items", body.toString(), new Response() {
+            @Override
+            public void ok(byte[] data) {
+                d.onDone(true, null);
+            }
+
+            @Override
+            public void fail(String message) {
+                d.onDone(false, message);
+            }
+        });
+    }
 
     public void save(String uri, boolean saved, Done d) {
         write(saved ? "PUT" : "DELETE", "/v1/me/library?uris=" + enc(uri), d);
@@ -405,7 +595,9 @@ public final class WebApi implements NativeEngine.Listener {
             case "playlist": {
                 JSONObject owner = o.optJSONObject("owner");
                 sub = "Playlist" + (owner == null ? "" : " · " + owner.optString("display_name"));
-                return new Item(o.optString("uri"), name, sub, kind);
+                it = new Item(o.optString("uri"), name, sub, kind);
+                it.ownerId = owner == null ? null : owner.optString("id", null);
+                return it;
             }
             case "artist":
                 return new Item(o.optString("uri"), name, "Artista", kind);
@@ -478,7 +670,7 @@ public final class WebApi implements NativeEngine.Listener {
     }
 
     private void read(final String path, final Result r, final Parser parser, final Flags flags) {
-        request("GET", path, new Response() {
+        request("GET", path, null, new Response() {
             @Override
             public void ok(byte[] body) {
                 try {
@@ -508,7 +700,7 @@ public final class WebApi implements NativeEngine.Listener {
     }
 
     private void write(String method, String path, final Done d) {
-        request(method, path, new Response() {
+        request(method, path, null, new Response() {
             @Override
             public void ok(byte[] body) {
                 d.onDone(true, null);
@@ -532,7 +724,8 @@ public final class WebApi implements NativeEngine.Listener {
         void onToken(String token, boolean personal, String error);
     }
 
-    private void request(final String method, final String path, final Response res) {
+    private void request(final String method, final String path, final String jsonBody,
+                         final Response res) {
         long wait = cooldownUntil - SystemClock.elapsedRealtime();
         if (wait > 0) {
             res.fail(rateLimitMessage(!OAuthTokens.has(app, OAuthTokens.PERSONAL), wait / 1000 + 1));
@@ -550,10 +743,13 @@ public final class WebApi implements NativeEngine.Listener {
                 JSONObject headers = new JSONObject();
                 try {
                     headers.put("Authorization", "Bearer " + tok);
+                    if (jsonBody != null) {
+                        headers.put("Content-Type", "application/json");
+                    }
                 } catch (Exception ignored) {
                 }
                 // HTTPS por el motor: mismo comportamiento en Android 4.4 y en 15.
-                NativeEngine.http(method, API + path, headers, null, new NativeEngine.HttpCallback() {
+                NativeEngine.http(method, API + path, headers, jsonBody, new NativeEngine.HttpCallback() {
                     @Override
                     public void onResponse(int status, byte[] body, String retryAfter) {
                         if (status == 429) {
