@@ -3,7 +3,7 @@
 Cliente de Spotify **liviano** para Android, inspirado en [Spotifast](https://github.com/crmne/spotifast).
 Corre **solo en el teléfono**: sin PC, sin la app oficial y sin apps auxiliares. APK de unos 3 MB.
 
-- Android **5.0 (API 21) en adelante**, incluidos teléfonos de 32 bits (armeabi-v7a).
+- Android **4.4 KitKat (API 19) en adelante**: ARM de 32/64 bits y x86 de 32/64 bits (Intel Atom).
 - Reproduce de verdad en el teléfono: el motor es [librespot](https://github.com/librespot-org/librespot) (código abierto), compilado en Rust dentro del APK.
 - La UI y el motor se comunican con el **mismo protocolo JSON que la API WebSocket de Spotify Soloist**.
 - Requiere **Spotify Premium**, igual que Spotifast y Soloist.
@@ -17,6 +17,20 @@ Por eso el motor es librespot, la misma alternativa que usa Spotifast como "repr
 La UI le habla al motor con comandos Soloist (`{"type":"command","command":"pause"}`) y recibe sus eventos
 (`playback_state`, `track_changed`, `position_sync`…). Si Spotify publica Soloist para Android,
 alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PUERTO`, sin tocar la UI.
+
+## Android 4.4
+
+- El motor de 32 bits se compila con el NDK r25 (el último que genera binarios para API 19).
+- `native/src/compat.rs` implementa las funciones de bionic que faltan en KitKat (`epoll_create1`, `fstat64`, `dl_iterate_phdr`) y `getifaddrs`, que Android recién agregó en 7.0. En versiones nuevas se usan las del sistema.
+- **Todo el HTTPS pasa por el motor** (rustls con certificados propios): Android 4.4 trae TLS 1.2 apagado y certificados raíz viejos.
+- Tema Holo en 4.4 y Material desde 5.0. Controles de pantalla bloqueada con `RemoteControlClient` en 4.4 y `MediaSession` desde 5.0.
+
+## Login
+
+1. **Navegador** (normal): OAuth PKCE con un servidor local en `127.0.0.1:8898`.
+2. **Otro dispositivo (Spotify Connect)**: para teléfonos cuyo navegador no puede abrir la página de Spotify. El teléfono se anuncia en la Wi-Fi (mDNS). En cualquier otra app de Spotify de la misma red se elige «Spotifast …» una sola vez, y esa app le pasa la sesión. Es el mismo mecanismo con el que se empareja Soloist.
+
+librespot está parcheado (`native/vendor/librespot-core`, ver "SPOTIFAST PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
 
 ## Arquitectura
 
@@ -65,10 +79,10 @@ alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PU
 
 ## Compilar
 
-Requisitos: JDK 17+, Android SDK (API 35) y NDK 27.2.12479018, Rust con `cargo-ndk`.
+Requisitos: JDK 17+, Android SDK (API 35) y NDK 25.2.9519653, Rust con `cargo-ndk`.
 
 ```bash
-rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
 cargo install cargo-ndk
 ./gradlew assembleRelease          # compila también el motor Rust (tarea cargoBuild)
 ./gradlew assembleRelease -PskipRust   # si las .so ya están en app/src/main/jniLibs
@@ -79,7 +93,7 @@ El APK de release se firma con la clave de debug para poder instalarlo directo. 
 
 ## Limitaciones conocidas (honestas)
 
-- **No está probado en un teléfono real todavía.** Compila para las tres arquitecturas y lint no reporta APIs fuera de Android 5, pero la sesión, el audio y el login hay que validarlos en un equipo.
+- Probado en un emulador; falta validarlo en más teléfonos reales, sobre todo con Android 4.4.
 - librespot no es oficial. Spotify cambió su protocolo varias veces y a veces lo rompe temporalmente.
 - La búsqueda usa la Web API con el token de la sesión de librespot. Si Spotify restringe ese acceso, la reproducción sigue funcionando (enlaces compartidos y Connect), pero la búsqueda no.
 - "Agregar a la cola" todavía no está implementado: el motor no lo expone.

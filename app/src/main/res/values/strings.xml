@@ -21,4 +21,7 @@
     <string name="cache">Caché de audio (MB, 0 = sin límite)</string>
     <string name="idle">Apagar motor tras N minutos en pausa</string>
     <string name="save">Guardar</string>
+    <string name="pair">Usar otro dispositivo (Spotify Connect)</string>
+    <string name="pair_cancel">Cancelar</string>
+    <string name="pair_info">En otro celular, tablet o PC conectado a la misma Wi-Fi: abrí Spotify → Dispositivos → elegí «%1$s».\nSolo hace falta una vez.</string>
 </resources>

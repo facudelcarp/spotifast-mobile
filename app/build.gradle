@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.spotifast.mobile"
-        // Android 5.0 Lollipop (2014): VectorDrawable y Material nativos, sin AndroidX.
-        minSdk 21
+        // Android 4.4 KitKat (2013). Los íconos vectoriales se convierten a PNG al compilar.
+        minSdk 19
         targetSdk 35
         versionCode 1
         versionName "0.1.0"
@@ -17,7 +17,8 @@ android {
         resourceConfigurations += ["es", "en"]
     }
 
-    ndkVersion "27.2.12479018"
+    // NDK r25: el último que puede generar binarios para Android 4.4 (API 19).
+    ndkVersion "25.2.9519653"
 
     buildTypes {
         release {
@@ -44,7 +45,7 @@ android {
         abi {
             enable true
             reset()
-            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            include "armeabi-v7a", "x86", "arm64-v8a", "x86_64"
             universalApk true
         }
     }
@@ -53,17 +54,28 @@ android {
 // ---- Motor nativo (Rust + librespot) ------------------------------------------------------
 // Compila native/ con cargo-ndk y deja libspotifast.so en src/main/jniLibs.
 // Saltear con -PskipRust si las .so ya están compiladas (p. ej. en un paso previo de CI).
+// Los ABIs de 32 bits se compilan para API 19 (Android 4.4); los de 64 bits empiezan en API 21.
+// x86 cubre teléfonos Intel Atom de la época de KitKat (p. ej. ASUS Zenfone 4/5).
 def ndkDir = android.ndkDirectory
+def jniOut = file("src/main/jniLibs").absolutePath
+def cargoNdk = { List<String> abis, String api ->
+    def cmd = ["cargo", "ndk"]
+    abis.each { cmd += ["-t", it] }
+    cmd + ["-P", api, "-o", jniOut, "build", "--release"]
+}
+tasks.register("cargoBuild32", Exec) {
+    workingDir rootProject.file("native")
+    environment "ANDROID_NDK_HOME", ndkDir.absolutePath
+    commandLine cargoNdk(["armeabi-v7a", "x86"], "19")
+    onlyIf { !project.hasProperty("skipRust") }
+}
 tasks.register("cargoBuild", Exec) {
     group = "build"
     description = "Compila el motor librespot para Android"
+    dependsOn "cargoBuild32"
     workingDir rootProject.file("native")
     environment "ANDROID_NDK_HOME", ndkDir.absolutePath
-    commandLine "cargo", "ndk",
-            "-t", "armeabi-v7a", "-t", "arm64-v8a", "-t", "x86_64",
-            "-P", "21",
-            "-o", file("src/main/jniLibs").absolutePath,
-            "build", "--release"
+    commandLine cargoNdk(["arm64-v8a", "x86_64"], "21")
     onlyIf { !project.hasProperty("skipRust") }
 }
 tasks.named("preBuild") { dependsOn "cargoBuild" }

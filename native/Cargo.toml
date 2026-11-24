@@ -15,7 +15,13 @@ crate-type = ["cdylib"]
 librespot-core = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 librespot-playback = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 librespot-connect = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
+librespot-discovery = { version = "0.8.0", default-features = false, features = ["with-libmdns", "rustls-tls-webpki-roots"] }
 librespot-metadata = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
+futures-util = { version = "0.3", default-features = false }
+libc = "0.2"
+http = "1"
+bytes = "1"
+http-body-util = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 jni = "0.21"
 serde_json = "1"
@@ -30,3 +36,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# librespot-core parcheado (ver vendor/librespot-core/src/config.rs, "SPOTIFAST PATCH").
+[patch.crates-io]
+librespot-core = { path = "vendor/librespot-core" }

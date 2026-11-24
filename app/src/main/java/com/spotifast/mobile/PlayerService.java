@@ -14,9 +14,6 @@ import android.graphics.Bitmap;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
-import android.media.MediaMetadata;
-import android.media.session.MediaSession;
-import android.media.session.PlaybackState;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
@@ -27,6 +24,7 @@ import android.os.PowerManager;
 import com.spotifast.mobile.engine.AudioOut;
 import com.spotifast.mobile.engine.EngineState;
 import com.spotifast.mobile.engine.NativeEngine;
+import com.spotifast.mobile.media.MediaControls;
 import com.spotifast.mobile.ui.CoverLoader;
 import com.spotifast.mobile.ui.MainActivity;
 
@@ -43,6 +41,8 @@ public final class PlayerService extends Service implements EngineState.Observer
     private static final String ACTION_NEXT = "com.spotifast.NEXT";
     private static final String ACTION_PREV = "com.spotifast.PREV";
     private static final String ACTION_QUIT = "com.spotifast.QUIT";
+    private static final String ACTION_PAIR = "com.spotifast.PAIR";
+    private static final String ACTION_PAIR_CANCEL = "com.spotifast.PAIR_CANCEL";
     private static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
 
@@ -52,7 +52,8 @@ public final class PlayerService extends Service implements EngineState.Observer
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AudioOut audio = new AudioOut();
     private Prefs prefs;
-    private MediaSession session;
+    private MediaControls controls;
+    private WifiManager.MulticastLock multicastLock;
     private AudioManager am;
     private AudioFocusRequest focusRequest;
     private PowerManager.WakeLock wakeLock;
@@ -65,7 +66,7 @@ public final class PlayerService extends Service implements EngineState.Observer
         @Override
         public void run() {
             EngineState s = EngineState.get();
-            if (!s.isPlaying() && !uiVisible) {
+            if (!s.isPlaying() && !uiVisible && !s.pairing) {
                 stopSelf();
             } else if (!s.isPlaying()) {
                 scheduleIdleStop();
@@ -109,6 +110,15 @@ public final class PlayerService extends Service implements EngineState.Observer
         c.startService(i);
     }
 
+    /** Login alternativo: el teléfono aparece en las apps de Spotify de la misma Wi-Fi. */
+    public static void pair(Context c, boolean start) {
+        c.startService(new Intent(c, PlayerService.class).setAction(start ? ACTION_PAIR : ACTION_PAIR_CANCEL));
+    }
+
+    public static void toggle(Context c) {
+        c.startService(new Intent(c, PlayerService.class).setAction(ACTION_TOGGLE));
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -123,42 +133,9 @@ public final class PlayerService extends Service implements EngineState.Observer
         wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "spotifast:play");
         wifiLock.setReferenceCounted(false);
 
-        session = new MediaSession(this, "Spotifast");
-        session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
-        session.setCallback(new MediaSession.Callback() {
-            @Override
-            public void onPlay() {
-                NativeEngine.command("play");
-            }
-
-            @Override
-            public void onPause() {
-                NativeEngine.command("pause");
-            }
-
-            @Override
-            public void onSkipToNext() {
-                NativeEngine.command("skip_next");
-            }
-
-            @Override
-            public void onSkipToPrevious() {
-                NativeEngine.command("skip_prev");
-            }
-
-            @Override
-            public void onSeekTo(long pos) {
-                NativeEngine.command("seek", "position_ms", pos);
-            }
-
-            @Override
-            public void onStop() {
-                NativeEngine.command("pause");
-            }
-        });
-        session.setSessionActivity(PendingIntent.getActivity(this, 0,
-                new Intent(this, MainActivity.class), pendingFlags()));
-        session.setActive(true);
+        multicastLock = wm.createMulticastLock("spotifast:pair");
+        multicastLock.setReferenceCounted(false);
+        controls = MediaControls.create(this);
 
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -190,12 +167,25 @@ public final class PlayerService extends Service implements EngineState.Observer
             NativeEngine.command("skip_prev");
         } else if (ACTION_QUIT.equals(action)) {
             stopSelf();
+        } else if (ACTION_PAIR.equals(action)) {
+            // Android filtra multicast en Wi-Fi si nadie tiene este lock: sin él, mDNS no llega.
+            multicastLock.acquire();
+            EngineState.get().markPairing();
+            NativeEngine.startPairing(getFilesDir().getAbsolutePath(), getCacheDir().getAbsolutePath(),
+                    prefs.deviceName(), prefs.deviceId(), wifiIp(), prefs.bitrate(), prefs.volume(),
+                    prefs.cacheMb());
+            scheduleIdleStop();
+        } else if (ACTION_PAIR_CANCEL.equals(action)) {
+            NativeEngine.stopPairing();
         }
         return START_NOT_STICKY;
     }
 
     @Override
     public void onStateChanged(EngineState s) {
+        if (!s.pairing && multicastLock.isHeld()) {
+            multicastLock.release();
+        }
         boolean playing = s.isPlaying() || "buffering".equals(s.status);
         if (playing) {
             handler.removeCallbacks(idleStop);
@@ -256,39 +246,20 @@ public final class PlayerService extends Service implements EngineState.Observer
     }
 
     private void updateSession(EngineState s) {
-        int st;
-        switch (s.status) {
-            case "playing":
-                st = PlaybackState.STATE_PLAYING;
-                break;
-            case "paused":
-                st = PlaybackState.STATE_PAUSED;
-                break;
-            case "buffering":
-                st = PlaybackState.STATE_BUFFERING;
-                break;
-            default:
-                st = PlaybackState.STATE_STOPPED;
+        boolean changed = !s.uri.equals(lastMetaUri);
+        lastMetaUri = s.uri;
+        Bitmap art = prefs.eco() ? null : CoverLoader.cached(s.coverDefault);
+        controls.update(s, art, changed);
+    }
+
+    @SuppressWarnings("deprecation")
+    private String wifiIp() {
+        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+        int ip = wm.getConnectionInfo() == null ? 0 : wm.getConnectionInfo().getIpAddress();
+        if (ip == 0) {
+            return "";
         }
-        session.setPlaybackState(new PlaybackState.Builder()
-                .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE
-                        | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SKIP_TO_NEXT
-                        | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_SEEK_TO)
-                .setState(st, s.positionNow(), s.isPlaying() ? 1f : 0f)
-                .build());
-        if (!s.uri.equals(lastMetaUri)) {
-            lastMetaUri = s.uri;
-            MediaMetadata.Builder m = new MediaMetadata.Builder()
-                    .putString(MediaMetadata.METADATA_KEY_TITLE, s.title)
-                    .putString(MediaMetadata.METADATA_KEY_ARTIST, s.artist)
-                    .putString(MediaMetadata.METADATA_KEY_ALBUM, s.album)
-                    .putLong(MediaMetadata.METADATA_KEY_DURATION, s.durationMs);
-            Bitmap art = prefs.eco() ? null : CoverLoader.cached(s.coverDefault);
-            if (art != null) {
-                m.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, art);
-            }
-            session.setMetadata(m.build());
-        }
+        return (ip & 0xff) + "." + ((ip >> 8) & 0xff) + "." + ((ip >> 16) & 0xff) + "." + ((ip >> 24) & 0xff);
     }
 
     @SuppressWarnings("deprecation")
@@ -303,17 +274,14 @@ public final class PlayerService extends Service implements EngineState.Observer
                 .setContentText(s.artist)
                 .setShowWhen(false)
                 .setOngoing(playing)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setContentIntent(PendingIntent.getActivity(this, 0,
                         new Intent(this, MainActivity.class), pendingFlags()))
                 .setDeleteIntent(service(ACTION_QUIT, 4))
                 .addAction(R.drawable.ic_prev, getString(R.string.prev), service(ACTION_PREV, 1))
                 .addAction(playing ? R.drawable.ic_pause : R.drawable.ic_play,
                         getString(playing ? R.string.pause : R.string.play), service(ACTION_TOGGLE, 2))
-                .addAction(R.drawable.ic_next, getString(R.string.next), service(ACTION_NEXT, 3))
-                .setStyle(new Notification.MediaStyle()
-                        .setMediaSession(session.getSessionToken())
-                        .setShowActionsInCompactView(0, 1, 2));
+                .addAction(R.drawable.ic_next, getString(R.string.next), service(ACTION_NEXT, 3));
+        controls.decorate(b);
         if (Build.VERSION.SDK_INT < 26) {
             b.setPriority(Notification.PRIORITY_LOW);
         }
@@ -366,7 +334,11 @@ public final class PlayerService extends Service implements EngineState.Observer
         release();
         dropForeground(true);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).cancel(NOTIF_ID);
-        session.release();
+        NativeEngine.stopPairing();
+        if (multicastLock.isHeld()) {
+            multicastLock.release();
+        }
+        controls.release();
         NativeEngine.setAudioOut(null);
         audio.release();
         super.onDestroy();

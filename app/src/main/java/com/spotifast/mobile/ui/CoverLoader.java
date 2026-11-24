@@ -7,9 +7,8 @@ import android.os.Looper;
 import android.util.LruCache;
 import android.widget.ImageView;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import com.spotifast.mobile.engine.NativeEngine;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,31 +57,31 @@ public final class CoverLoader {
             cb.onBitmap(hit);
             return;
         }
-        IO.execute(new Runnable() {
+        // Descarga por el motor (TLS propio) y decodificación fuera del hilo principal.
+        NativeEngine.http("GET", url, null, null, new NativeEngine.HttpCallback() {
             @Override
-            public void run() {
-                try {
-                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                    c.setConnectTimeout(10000);
-                    c.setReadTimeout(10000);
-                    InputStream in = c.getInputStream();
-                    BitmapFactory.Options o = new BitmapFactory.Options();
-                    o.inPreferredConfig = Bitmap.Config.RGB_565; // mitad de memoria
-                    final Bitmap b = BitmapFactory.decodeStream(in, null, o);
-                    in.close();
-                    c.disconnect();
-                    if (b == null) {
-                        return;
-                    }
-                    CACHE.put(url, b);
-                    MAIN.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            cb.onBitmap(b);
-                        }
-                    });
-                } catch (Exception ignored) {
+            public void onResponse(int status, final byte[] body) {
+                if (status != 200 || body == null) {
+                    return;
                 }
+                IO.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        BitmapFactory.Options o = new BitmapFactory.Options();
+                        o.inPreferredConfig = Bitmap.Config.RGB_565; // mitad de memoria
+                        final Bitmap b = BitmapFactory.decodeByteArray(body, 0, body.length, o);
+                        if (b == null) {
+                            return;
+                        }
+                        MAIN.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                CACHE.put(url, b);
+                                cb.onBitmap(b);
+                            }
+                        });
+                    }
+                });
             }
         });
     }
