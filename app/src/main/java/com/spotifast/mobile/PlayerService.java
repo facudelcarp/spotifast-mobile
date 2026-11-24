@@ -43,6 +43,9 @@ public final class PlayerService extends Service implements EngineState.Observer
     private static final String ACTION_QUIT = "com.spotifast.QUIT";
     private static final String ACTION_PAIR = "com.spotifast.PAIR";
     private static final String ACTION_PAIR_CANCEL = "com.spotifast.PAIR_CANCEL";
+    private static final String ACTION_PREFETCH = "com.spotifast.PREFETCH";
+    private static final String ACTION_PREFETCH_CANCEL = "com.spotifast.PREFETCH_CANCEL";
+    private static final int PREFETCH_NOTIF_ID = 2;
     private static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
 
@@ -66,7 +69,7 @@ public final class PlayerService extends Service implements EngineState.Observer
         @Override
         public void run() {
             EngineState s = EngineState.get();
-            if (!s.isPlaying() && !uiVisible && !s.pairing) {
+            if (!s.isPlaying() && !uiVisible && !s.pairing && !prefetching) {
                 stopSelf();
             } else if (!s.isPlaying()) {
                 scheduleIdleStop();
@@ -111,6 +114,19 @@ public final class PlayerService extends Service implements EngineState.Observer
     }
 
     /** Login alternativo: el teléfono aparece en las apps de Spotify de la misma Wi-Fi. */
+    /**
+     * Precargar una lista de pistas (con Wi-Fi). Corre en el servicio para seguir aunque se
+     * cierre la app, con progreso y "Cancelar" en una notificación.
+     */
+    public static void prefetch(Context c, String title, java.util.List<String> trackUris) {
+        org.json.JSONArray a = new org.json.JSONArray();
+        for (String u : trackUris) {
+            a.put(u);
+        }
+        c.startService(new Intent(c, PlayerService.class).setAction(ACTION_PREFETCH)
+                .putExtra("title", title).putExtra("uris", a.toString()));
+    }
+
     public static void pair(Context c, boolean start) {
         c.startService(new Intent(c, PlayerService.class).setAction(start ? ACTION_PAIR : ACTION_PAIR_CANCEL));
     }
@@ -175,6 +191,10 @@ public final class PlayerService extends Service implements EngineState.Observer
                     prefs.deviceName(), prefs.deviceId(), wifiIp(), prefs.bitrate(), prefs.volume(),
                     prefs.cacheMb());
             scheduleIdleStop();
+        } else if (ACTION_PREFETCH.equals(action)) {
+            startPrefetch(intent.getStringExtra("title"), intent.getStringExtra("uris"));
+        } else if (ACTION_PREFETCH_CANCEL.equals(action)) {
+            NativeEngine.prefetchCancel();
         } else if (ACTION_PAIR_CANCEL.equals(action)) {
             NativeEngine.stopPairing();
         }
@@ -190,7 +210,7 @@ public final class PlayerService extends Service implements EngineState.Observer
         if (playing) {
             handler.removeCallbacks(idleStop);
             acquire();
-        } else {
+        } else if (!prefetching) {
             release();
             scheduleIdleStop();
         }
@@ -199,6 +219,124 @@ public final class PlayerService extends Service implements EngineState.Observer
         if (!s.running && !s.loggedIn) {
             dropForeground(true);
         }
+    }
+
+    // ------------------------------------------------------------------ precarga
+
+    private String prefetchTitle;
+    private boolean prefetching;
+
+    private final NativeEngine.Listener prefetchListener = new NativeEngine.Listener() {
+        @Override
+        public void onEngineEvent(String type, org.json.JSONObject ev) {
+            if (!"prefetch".equals(type)) {
+                return;
+            }
+            String st = ev.optString("state");
+            int done = ev.optInt("done"), total = ev.optInt("total");
+            long mb = ev.optLong("bytes") / (1024 * 1024);
+            if ("progress".equals(st)) {
+                prefetchNotification(done + " de " + total + " · " + mb + " MB", done, total, true);
+                return;
+            }
+            prefetching = false;
+            releasePrefetchLocks();
+            String text;
+            switch (st) {
+                case "finished":
+                    int failed = ev.optInt("failed");
+                    text = "Lista: " + (done - failed) + " de " + total + " canciones guardadas (" + mb + " MB)"
+                            + (failed > 0 ? " · " + failed + " no disponibles" : "");
+                    break;
+                case "cancelled":
+                    text = "Cancelada: " + done + " de " + total;
+                    break;
+                case "busy":
+                    text = "Ya hay una precarga en curso";
+                    break;
+                default:
+                    text = ev.optString("message", "No se pudo precargar");
+            }
+            prefetchNotification(text, 0, 0, false);
+            if (!uiVisible && !EngineState.get().isPlaying()) {
+                scheduleIdleStop();
+            }
+        }
+    };
+
+    private void startPrefetch(String title, String urisJson) {
+        prefetchTitle = title == null ? "Playlist" : title;
+        if (prefs.prefetchWifiOnly() && !onWifi()) {
+            prefetchNotification("Conectate a una red Wi-Fi para precargar (o cambialo en Ajustes)", 0, 0, false);
+            return;
+        }
+        EngineState s = EngineState.get();
+        if (!s.running) {
+            // sin motor no hay sesión: arrancarlo y reintentar cuando conecte
+            s.markStarting();
+            NativeEngine.start(getFilesDir().getAbsolutePath(), getCacheDir().getAbsolutePath(),
+                    prefs.deviceName(), prefs.deviceId(), null,
+                    prefs.bitrate(), prefs.volume(), prefs.cacheMb());
+        }
+        NativeEngine.addListener(prefetchListener);
+        prefetching = true;
+        handler.removeCallbacks(idleStop);
+        if (!wakeLock.isHeld()) {
+            wakeLock.acquire();
+        }
+        if (!wifiLock.isHeld()) {
+            wifiLock.acquire();
+        }
+        prefetchNotification("Preparando…", 0, 0, true);
+        final String uris = urisJson == null ? "[]" : urisJson;
+        // Si el motor recién arranca, esperar a que haya sesión (como máximo ~20 s).
+        handler.post(new Runnable() {
+            int tries;
+
+            @Override
+            public void run() {
+                if (EngineState.get().loggedIn || tries++ > 40) {
+                    NativeEngine.prefetch(uris, prefs.bitrate(), 1);
+                } else {
+                    handler.postDelayed(this, 500);
+                }
+            }
+        });
+    }
+
+    private void releasePrefetchLocks() {
+        if (!EngineState.get().isPlaying()) {
+            release();
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private boolean onWifi() {
+        android.net.ConnectivityManager cm =
+                (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        android.net.NetworkInfo ni = cm == null ? null : cm.getActiveNetworkInfo();
+        return ni != null && ni.isConnected() && ni.getType() == android.net.ConnectivityManager.TYPE_WIFI;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void prefetchNotification(String text, int done, int total, boolean ongoing) {
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
+        b.setSmallIcon(R.drawable.ic_note)
+                .setContentTitle("Precarga · " + prefetchTitle)
+                .setContentText(text)
+                .setOngoing(ongoing)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(PendingIntent.getActivity(this, 0,
+                        new Intent(this, MainActivity.class), pendingFlags()));
+        if (ongoing) {
+            b.setProgress(Math.max(total, 1), done, total == 0);
+            b.addAction(R.drawable.ic_close, "Cancelar", service(ACTION_PREFETCH_CANCEL, 5));
+        }
+        if (Build.VERSION.SDK_INT < 26) {
+            b.setPriority(Notification.PRIORITY_LOW);
+        }
+        ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(PREFETCH_NOTIF_ID, b.build());
     }
 
     private void scheduleIdleStop() {
@@ -328,6 +466,10 @@ public final class PlayerService extends Service implements EngineState.Observer
 
     @Override
     public void onDestroy() {
+        NativeEngine.removeListener(prefetchListener);
+        if (prefetching) {
+            NativeEngine.prefetchCancel();
+        }
         EngineState.get().removeObserver(this);
         handler.removeCallbacks(idleStop);
         NativeEngine.stop();

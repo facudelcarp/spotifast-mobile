@@ -53,7 +53,8 @@ public final class Prefs {
 
     /** Caché de audio: repetir canciones no gasta datos. */
     public int cacheMb() {
-        return p.getInt("cache_mb", 200);
+        // 512 MB: alcanza para unas 25 h de audio a 96 kbps (precargas incluidas).
+        return p.getInt("cache_mb", 512);
     }
 
     public void setCacheMb(int v) {
@@ -104,6 +105,15 @@ public final class Prefs {
 
     public void clearSearches() {
         p.edit().remove("search_history").apply();
+    }
+
+    /** Precargar solo con Wi-Fi (por defecto sí: es el punto de precargar). */
+    public boolean prefetchWifiOnly() {
+        return p.getBoolean("prefetch_wifi_only", true);
+    }
+
+    public void setPrefetchWifiOnly(boolean v) {
+        p.edit().putBoolean("prefetch_wifi_only", v).apply();
     }
 
     public int volume() {

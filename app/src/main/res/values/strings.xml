@@ -18,7 +18,7 @@
     <string name="device_name">Nombre del dispositivo</string>
     <string name="quality">Calidad de audio</string>
     <string name="eco">Modo ahorro (sin imágenes)</string>
-    <string name="cache">Caché de audio (MB, 0 = sin límite)</string>
+    <string name="cache">Caché de audio en MB (precargas incluidas; 0 = sin límite)</string>
     <string name="idle">Apagar motor tras N minutos en pausa</string>
     <string name="save">Guardar</string>
     <string name="pair">Usar otro dispositivo (Spotify Connect)</string>
@@ -46,4 +46,7 @@
     <string name="chip_playlists">Playlists</string>
     <string name="chip_albums">Álbumes</string>
     <string name="chip_artists">Artistas</string>
+    <string name="prefetch_wifi_only">Precargar solo con Wi-Fi</string>
+    <string name="cache_clear">Vaciar caché de audio</string>
+    <string name="cache_use">En caché: %1$d MB (canciones escuchadas y precargadas)</string>
 </resources>

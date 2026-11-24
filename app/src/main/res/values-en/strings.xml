@@ -45,4 +45,7 @@
     <string name="chip_playlists">Playlists</string>
     <string name="chip_albums">Albums</string>
     <string name="chip_artists">Artists</string>
+    <string name="prefetch_wifi_only">Preload on Wi-Fi only</string>
+    <string name="cache_clear">Clear audio cache</string>
+    <string name="cache_use">Cached: %1$d MB (played and preloaded songs)</string>
 </resources>

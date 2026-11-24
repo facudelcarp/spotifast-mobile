@@ -67,6 +67,10 @@ public final class NativeEngine {
 
     private static native void nativeStopPairing();
 
+    private static native void nativePrefetch(String urisJson, int bitrate, int reqId);
+
+    private static native void nativePrefetchCancel();
+
     private static native void nativeHttp(String method, String url, String headersJson,
                                           String body, int reqId);
 
@@ -98,6 +102,15 @@ public final class NativeEngine {
 
     public static void stopPairing() {
         nativeStopPairing();
+    }
+
+    /** Precarga a la caché (cifrada) los archivos de audio de estas pistas. Ver native/src/prefetch.rs. */
+    public static void prefetch(String urisJson, int bitrate, int reqId) {
+        nativePrefetch(urisJson, bitrate, reqId);
+    }
+
+    public static void prefetchCancel() {
+        nativePrefetchCancel();
     }
 
     /**

@@ -62,6 +62,7 @@ final class Browser {
     private static final String QUERY = "query";
     private static final String CLEAR_HISTORY = "clear_history";
     private static final String PAIR = "pair";
+    private static final String PREFETCH = "prefetch";
 
     private final Activity activity;
     private final ListView list;
@@ -389,6 +390,9 @@ final class Browser {
                 NativeEngine.command("set_shuffle", "enabled", true);
                 play(p.contextUri, null);
                 return;
+            case PREFETCH:
+                prefetch(p);
+                return;
             case "header":
                 return;
             default:
@@ -407,6 +411,7 @@ final class Browser {
 
     private boolean onLongClick(final WebApi.Item it) {
         if (it.isHeader() || NAV.equals(it.kind) || MORE.equals(it.kind) || LIKED.equals(it.kind)
+                || PREFETCH.equals(it.kind)
                 || QUERY.equals(it.kind) || CLEAR_HISTORY.equals(it.kind)
                 || PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind)) {
             return false;
@@ -481,6 +486,64 @@ final class Browser {
                 })
                 .show();
         return true;
+    }
+
+    /**
+     * Precargar la lista completa: junta todas las páginas (sin mostrarlas de golpe) y le pasa
+     * las pistas al servicio, que las baja a la caché con Wi-Fi.
+     */
+    private void prefetch(final Page p) {
+        final List<String> uris = new ArrayList<>();
+        for (WebApi.Item it : p.items) {
+            if ("track".equals(it.kind)) {
+                uris.add(it.uri);
+            }
+        }
+        if (p.next == null) {
+            startPrefetch(p.title, uris);
+            return;
+        }
+        Toast.makeText(activity, "Juntando las canciones de la lista…", Toast.LENGTH_SHORT).show();
+        collect(p.title, p.next, uris);
+    }
+
+    private void collect(final String title, String next, final List<String> uris) {
+        api.page(next, new WebApi.Result() {
+            @Override
+            public void onItems(List<WebApi.Item> items, String more) {
+                for (WebApi.Item it : items) {
+                    if ("track".equals(it.kind)) {
+                        uris.add(it.uri);
+                    }
+                }
+                if (more != null && uris.size() < 2000) {
+                    collect(title, more, uris);
+                } else {
+                    startPrefetch(title, uris);
+                }
+            }
+
+            @Override
+            public void onError(String message) {
+                if (uris.isEmpty()) {
+                    Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+                } else {
+                    startPrefetch(title, uris); // al menos lo que se pudo juntar
+                }
+            }
+        });
+    }
+
+    private void startPrefetch(String title, List<String> uris) {
+        if (uris.isEmpty()) {
+            Toast.makeText(activity, "No hay canciones para precargar", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // ~0,7 MB por minuto a 96 kbps; una canción promedio ronda 2,5 MB.
+        int mb = (int) (uris.size() * 2.5f * prefs.bitrate() / 96f);
+        Toast.makeText(activity, "Precargando " + uris.size() + " canciones (~" + mb
+                + " MB). Mirá el progreso en la notificación.", Toast.LENGTH_LONG).show();
+        com.spotifast.mobile.PlayerService.prefetch(activity, title, uris);
     }
 
     /** Elegir una de tus playlists y agregarle la canción. */
@@ -593,6 +656,10 @@ final class Browser {
         if (p.contextUri != null && hasPlayable) {
             rows.add(WebApi.Item.make("", "Reproducir", "", PLAY_ALL));
             rows.add(WebApi.Item.make("", "Aleatorio", "", SHUFFLE_ALL));
+            if (!p.contextUri.contains(":artist:")) {
+                rows.add(WebApi.Item.make("", "Precargar", "Baja el audio ahora con Wi-Fi y después casi no gasta datos",
+                        PREFETCH));
+            }
         }
         if (p.grid) {
             // Atajos (todo lo que está antes del primer encabezado) en filas de a dos.
@@ -690,6 +757,7 @@ final class Browser {
             android.widget.ImageView icon = (android.widget.ImageView) v.findViewById(android.R.id.icon);
             t1.setText(it.title);
             boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind) || MORE.equals(it.kind)
+                    || PREFETCH.equals(it.kind)
                     || CLEAR_HISTORY.equals(it.kind);
             boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().uri);
             t1.setTextColor(activity.getResources().getColor(
@@ -777,6 +845,11 @@ final class Browser {
                 case SHUFFLE_ALL:
                     pad = dp(13);
                     res = R.drawable.ic_shuffle;
+                    tint = R.color.accent;
+                    break;
+                case PREFETCH:
+                    pad = dp(13);
+                    res = R.drawable.ic_download;
                     tint = R.color.accent;
                     break;
                 case MORE:

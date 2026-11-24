@@ -2451,6 +2451,7 @@ dependencies = [
  "http-body-util",
  "jni",
  "libc",
+ "librespot-audio",
  "librespot-connect",
  "librespot-core",
  "librespot-discovery",
