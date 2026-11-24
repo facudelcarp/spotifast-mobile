@@ -32,4 +32,8 @@
     <string name="web_api_not_connected">No personal app: using the shared one (Spotify throttles it)</string>
     <string name="web_api_waiting">Waiting for authorization in the browser…</string>
     <string name="web_api_bad_id">The Client ID is 32 characters (0-9, a-f)</string>
+    <string name="tab_library">LIBRARY</string>
+    <string name="tab_search">SEARCH</string>
+    <string name="tab_queue">QUEUE</string>
+    <string name="like">Like</string>
 </resources>

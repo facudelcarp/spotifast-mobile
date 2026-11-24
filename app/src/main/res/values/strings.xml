@@ -33,4 +33,8 @@
     <string name="web_api_not_connected">Sin app propia: se usa la compartida (Spotify la limita)</string>
     <string name="web_api_waiting">Esperando la autorización en el navegador…</string>
     <string name="web_api_bad_id">El Client ID son 32 caracteres (0-9, a-f)</string>
+    <string name="tab_library">BIBLIOTECA</string>
+    <string name="tab_search">BUSCAR</string>
+    <string name="tab_queue">COLA</string>
+    <string name="like">Me gusta</string>
 </resources>

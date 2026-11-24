@@ -25,7 +25,7 @@ use jni::{JNIEnv, JavaVM};
 use log::{error, info, warn};
 use serde_json::{json, Value};
 
-use librespot_connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc};
+use librespot_connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingTrack, Spirc};
 use librespot_core::{
     authentication::Credentials,
     cache::Cache,
@@ -488,7 +488,23 @@ fn handle_command(text: &str) {
                     if !active {
                         map(spirc.activate())?;
                     }
-                    let opts = LoadRequestOptions { start_playing: true, ..Default::default() };
+                    // Extensión al protocolo Soloist: "offset_uri" (o "offset_index") arranca el
+                    // contexto en esa pista y sigue con el resto (tocar una canción de un álbum).
+                    let playing_track = cmd
+                        .get("offset_uri")
+                        .and_then(Value::as_str)
+                        .filter(|u| !u.is_empty())
+                        .map(|u| PlayingTrack::Uri(u.to_string()))
+                        .or_else(|| {
+                            cmd.get("offset_index")
+                                .and_then(Value::as_u64)
+                                .map(|i| PlayingTrack::Index(i as u32))
+                        });
+                    let opts = LoadRequestOptions {
+                        start_playing: true,
+                        playing_track,
+                        ..Default::default()
+                    };
                     let req = if uri.starts_with("spotify:track:") || uri.starts_with("spotify:episode:") {
                         LoadRequest::from_tracks(vec![uri.to_string()], opts)
                     } else {

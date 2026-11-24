@@ -66,15 +66,18 @@ public final class SpotifyAuth {
         /** Reproducción (librespot). También sirve de respaldo para la Web API compartida. */
         public static Grant playback() {
             return new Grant(CLIENT_ID, 8898, "streaming user-read-private "
-                    + "playlist-read-private playlist-read-collaborative user-library-read",
+                    + "playlist-read-private playlist-read-collaborative user-library-read "
+                    + "user-library-modify user-read-recently-played user-follow-read "
+                    + "user-read-playback-state user-modify-playback-state",
                     OAuthTokens.SHARED);
         }
 
         /** Web API con la app propia del usuario (mismos permisos de lectura que Spotifast). */
         public static Grant personal(String clientId) {
             return new Grant(clientId.trim(), 8989, "user-read-private playlist-read-private "
-                    + "playlist-read-collaborative user-library-read user-follow-read "
-                    + "user-read-recently-played user-top-read user-read-playback-state",
+                    + "playlist-read-collaborative user-library-read user-library-modify "
+                    + "user-follow-read user-read-recently-played user-top-read "
+                    + "user-read-playback-state user-modify-playback-state",
                     OAuthTokens.PERSONAL);
         }
     }
