@@ -2,6 +2,7 @@ package com.spotifast.mobile.ui;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.View;
@@ -17,6 +18,8 @@ import android.widget.TextView;
 import com.spotifast.mobile.PlayerService;
 import com.spotifast.mobile.Prefs;
 import com.spotifast.mobile.R;
+import com.spotifast.mobile.SpotifyAuth;
+import com.spotifast.mobile.web.OAuthTokens;
 
 import java.io.File;
 
@@ -58,6 +61,57 @@ public final class SettingsActivity extends Activity {
         final EditText cache = field(root, R.string.cache, String.valueOf(prefs.cacheMb()), InputType.TYPE_CLASS_NUMBER);
         final EditText idle = field(root, R.string.idle, String.valueOf(prefs.idleMinutes()), InputType.TYPE_CLASS_NUMBER);
 
+        // ---- Web API con app propia (como Spotifast): cupo propio, sin 429 de la app compartida
+        label(root, R.string.web_api);
+        TextView help = new TextView(this);
+        help.setTextSize(12);
+        help.setText(getString(R.string.web_api_help, SpotifyAuth.PERSONAL_REDIRECT));
+        root.addView(help);
+        Button dashboard = new Button(this);
+        dashboard.setText(R.string.web_api_dashboard);
+        dashboard.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://developer.spotify.com/dashboard")));
+            }
+        });
+        root.addView(dashboard);
+        final EditText clientId = field(root, R.string.web_api_client_id, prefs.webClientId(),
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        final TextView webStatus = new TextView(this);
+        webStatus.setTextSize(12);
+        webStatus.setText(OAuthTokens.has(this, OAuthTokens.PERSONAL)
+                ? R.string.web_api_connected : R.string.web_api_not_connected);
+        root.addView(webStatus);
+        Button authorize = new Button(this);
+        authorize.setText(R.string.web_api_authorize);
+        authorize.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                final String id = clientId.getText().toString().trim();
+                if (!SpotifyAuth.looksLikeClientId(id)) {
+                    webStatus.setText(R.string.web_api_bad_id);
+                    return;
+                }
+                prefs.setWebClientId(id);
+                webStatus.setText(R.string.web_api_waiting);
+                SpotifyAuth.login(SettingsActivity.this, SpotifyAuth.Grant.personal(id),
+                        new SpotifyAuth.Callback() {
+                            @Override
+                            public void onToken(String accessToken) {
+                                webStatus.setText(R.string.web_api_connected);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                webStatus.setText(message);
+                            }
+                        });
+            }
+        });
+        root.addView(authorize);
+
         Button save = new Button(this);
         save.setText(R.string.save);
         save.setOnClickListener(new View.OnClickListener() {
@@ -83,7 +137,7 @@ public final class SettingsActivity extends Activity {
             public void onClick(View v) {
                 stopService(new Intent(SettingsActivity.this, PlayerService.class));
                 new File(getFilesDir(), "credentials.json").delete();
-                com.spotifast.mobile.web.OAuthTokens.clear(SettingsActivity.this);
+                com.spotifast.mobile.web.OAuthTokens.clearAll(SettingsActivity.this);
                 finish();
             }
         });
@@ -93,7 +147,8 @@ public final class SettingsActivity extends Activity {
         about.setPadding(0, pad, 0, 0);
         about.setTextSize(11);
         about.setText("Motor: librespot (código abierto) dentro de la app. Protocolo de control "
-                + "compatible con Spotify Soloist. No afiliado a Spotify.");
+                + "compatible con Spotify Soloist. Web API con app propia, como Spotifast. "
+                + "No afiliado a Spotify.");
         root.addView(about);
 
         ScrollView sv = new ScrollView(this);

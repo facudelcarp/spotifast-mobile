@@ -32,6 +32,18 @@ alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PU
 
 librespot está parcheado (`native/vendor/librespot-core`, ver "SPOTIFAST PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
 
+## Búsqueda y biblioteca (Web API)
+
+Igual que Spotifast, la Web API usa **tu propia app de Spotify**. Con el client ID compartido, Spotify corta con `429 Too Many Requests`.
+
+1. En [Spotify for Developers](https://developer.spotify.com/dashboard) tocá **Create app** (la cuenta necesita Premium).
+2. Redirect URI: `http://127.0.0.1:8989/login`
+3. Tildá **Web API** y guardá.
+4. En Spotifast: ⋮ → Ajustes → pegá el **Client ID** → **Autorizar**.
+
+Orden de tokens: app propia → token del login de reproducción → token `login5` del motor.
+Ante un 429 se respeta `Retry-After` y no se reintenta.
+
 ## Arquitectura
 
 ```
@@ -95,7 +107,7 @@ El APK de release se firma con la clave de debug para poder instalarlo directo. 
 
 - Probado en un emulador; falta validarlo en más teléfonos reales, sobre todo con Android 4.4.
 - librespot no es oficial. Spotify cambió su protocolo varias veces y a veces lo rompe temporalmente.
-- La búsqueda usa la Web API con el token OAuth del login (se renueva solo). Si entraste por Spotify Connect se usa el token `login5` del motor; si Spotify lo rechaza, cerrá sesión y entrá con el navegador.
+- Sin app propia, la búsqueda depende del client ID compartido y Spotify la limita (429). Ver "Búsqueda y biblioteca".
 - "Agregar a la cola" todavía no está implementado: el motor no lo expone.
 - Sin descargas offline (como Spotifast).
 

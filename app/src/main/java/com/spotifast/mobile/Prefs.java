@@ -69,6 +69,15 @@ public final class Prefs {
         p.edit().putInt("idle_minutes", v).apply();
     }
 
+    /** Client ID de la app propia del usuario para la Web API ("" = usar la compartida). */
+    public String webClientId() {
+        return p.getString("web_client_id", "");
+    }
+
+    public void setWebClientId(String v) {
+        p.edit().putString("web_client_id", v).apply();
+    }
+
     public int volume() {
         return p.getInt("volume", 70);
     }

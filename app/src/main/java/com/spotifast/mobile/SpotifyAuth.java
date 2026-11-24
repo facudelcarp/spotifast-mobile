@@ -23,10 +23,14 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 
 /**
- * Login OAuth (PKCE) con el client ID de librespot, todo dentro del teléfono:
- * abre el navegador y atiende el redirect http://127.0.0.1:8898/login con un mini servidor.
- * El token obtenido se le pasa al motor, que guarda credenciales reutilizables y no vuelve
- * a pedir login.
+ * Login OAuth (PKCE) dentro del teléfono: abre el navegador y atiende el redirect en
+ * 127.0.0.1 con un mini servidor. Igual que Spotifast, hay dos autorizaciones separadas:
+ *
+ * - {@link Grant#playback()}: client ID de librespot (puerto 8898). El token va al motor, que
+ *   guarda credenciales reutilizables.
+ * - {@link Grant#personal(String)}: la app propia del usuario (puerto 8989) para la Web API.
+ *   Cada usuario tiene su propio cupo de pedidos: con el client ID compartido Spotify corta
+ *   con 429 (demasiados pedidos).
  */
 public final class SpotifyAuth {
 
@@ -37,11 +41,48 @@ public final class SpotifyAuth {
     }
 
     public static final String CLIENT_ID = "65b708073fc0480ea92a077233ca87bd";
-    private static final int PORT = 8898;
-    private static final String REDIRECT = "http://127.0.0.1:" + PORT + "/login";
-    private static final String SCOPES = "streaming user-read-private user-read-email "
-            + "user-read-playback-state user-modify-playback-state user-read-currently-playing "
-            + "playlist-read-private playlist-read-collaborative user-library-read";
+    /** Redirect que el usuario debe registrar en su app, carácter por carácter. */
+    public static final String PERSONAL_REDIRECT = "http://127.0.0.1:8989/login";
+
+    /** Qué app de Spotify autoriza, en qué puerto y con qué permisos. */
+    public static final class Grant {
+        public final String clientId;
+        final int port;
+        final String scopes;
+        /** Dónde guardar el token para la Web API ({@link OAuthTokens}). */
+        public final String kind;
+
+        private Grant(String clientId, int port, String scopes, String kind) {
+            this.clientId = clientId;
+            this.port = port;
+            this.scopes = scopes;
+            this.kind = kind;
+        }
+
+        String redirect() {
+            return "http://127.0.0.1:" + port + "/login";
+        }
+
+        /** Reproducción (librespot). También sirve de respaldo para la Web API compartida. */
+        public static Grant playback() {
+            return new Grant(CLIENT_ID, 8898, "streaming user-read-private "
+                    + "playlist-read-private playlist-read-collaborative user-library-read",
+                    OAuthTokens.SHARED);
+        }
+
+        /** Web API con la app propia del usuario (mismos permisos de lectura que Spotifast). */
+        public static Grant personal(String clientId) {
+            return new Grant(clientId.trim(), 8989, "user-read-private playlist-read-private "
+                    + "playlist-read-collaborative user-library-read user-follow-read "
+                    + "user-read-recently-played user-top-read user-read-playback-state",
+                    OAuthTokens.PERSONAL);
+        }
+    }
+
+    /** Un Client ID de Spotify son 32 caracteres hexadecimales. */
+    public static boolean looksLikeClientId(String id) {
+        return id != null && id.trim().matches("[0-9a-fA-F]{32}");
+    }
 
     private static volatile ServerSocket server;
 
@@ -49,6 +90,10 @@ public final class SpotifyAuth {
     }
 
     public static void login(final Context ctx, final Callback cb) {
+        login(ctx, Grant.playback(), cb);
+    }
+
+    public static void login(final Context ctx, final Grant grant, final Callback cb) {
         final Handler main = new Handler(Looper.getMainLooper());
         final String verifier = random(48);
         final String state = random(12);
@@ -62,16 +107,16 @@ public final class SpotifyAuth {
         }
         closeServer();
         try {
-            server = new ServerSocket(PORT, 1, InetAddress.getByName("127.0.0.1"));
+            server = new ServerSocket(grant.port, 1, InetAddress.getByName("127.0.0.1"));
             server.setSoTimeout(5 * 60 * 1000);
         } catch (Exception e) {
-            cb.onError("No se pudo abrir el puerto " + PORT + ": " + e.getMessage());
+            cb.onError("No se pudo abrir el puerto " + grant.port + ": " + e.getMessage());
             return;
         }
         String url = "https://accounts.spotify.com/authorize?response_type=code"
-                + "&client_id=" + CLIENT_ID
-                + "&redirect_uri=" + enc(REDIRECT)
-                + "&scope=" + enc(SCOPES)
+                + "&client_id=" + grant.clientId
+                + "&redirect_uri=" + enc(grant.redirect())
+                + "&scope=" + enc(grant.scopes)
                 + "&code_challenge_method=S256&code_challenge=" + challenge
                 + "&state=" + state;
 
@@ -83,7 +128,7 @@ public final class SpotifyAuth {
                     main.post(new Runnable() {
                         @Override
                         public void run() {
-                            exchange(ctx.getApplicationContext(), code, verifier, cb);
+                            exchange(ctx.getApplicationContext(), grant, code, verifier, cb);
                         }
                     });
                 } catch (final Exception e) {
@@ -146,9 +191,10 @@ public final class SpotifyAuth {
     }
 
     /** El canje del código se hace por el motor (TLS propio): anda también en Android 4.4. */
-    private static void exchange(final Context ctx, String code, String verifier, final Callback cb) {
+    private static void exchange(final Context ctx, final Grant grant, String code, String verifier,
+                                 final Callback cb) {
         String body = "grant_type=authorization_code&code=" + enc(code)
-                + "&redirect_uri=" + enc(REDIRECT) + "&client_id=" + CLIENT_ID
+                + "&redirect_uri=" + enc(grant.redirect()) + "&client_id=" + grant.clientId
                 + "&code_verifier=" + enc(verifier);
         JSONObject headers = new JSONObject();
         try {
@@ -158,7 +204,7 @@ public final class SpotifyAuth {
         NativeEngine.http("POST", "https://accounts.spotify.com/api/token", headers, body,
                 new NativeEngine.HttpCallback() {
                     @Override
-                    public void onResponse(int status, byte[] data) {
+                    public void onResponse(int status, byte[] data, String retryAfter) {
                         String text = utf8(data);
                         if (status < 200 || status >= 300) {
                             cb.onError(status == 0 ? "Sin conexión: " + text
@@ -167,7 +213,7 @@ public final class SpotifyAuth {
                         }
                         try {
                             JSONObject o = new JSONObject(text);
-                            OAuthTokens.save(ctx, o); // para la Web API (búsqueda/biblioteca)
+                            OAuthTokens.save(ctx, grant.kind, grant.clientId, o); // para la Web API
                             cb.onToken(o.getString("access_token"));
                         } catch (Exception e) {
                             cb.onError("Respuesta inválida de Spotify");
