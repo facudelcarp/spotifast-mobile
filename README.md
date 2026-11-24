@@ -95,7 +95,7 @@ El APK de release se firma con la clave de debug para poder instalarlo directo. 
 
 - Probado en un emulador; falta validarlo en más teléfonos reales, sobre todo con Android 4.4.
 - librespot no es oficial. Spotify cambió su protocolo varias veces y a veces lo rompe temporalmente.
-- La búsqueda usa la Web API con el token de la sesión de librespot. Si Spotify restringe ese acceso, la reproducción sigue funcionando (enlaces compartidos y Connect), pero la búsqueda no.
+- La búsqueda usa la Web API con el token OAuth del login (se renueva solo). Si entraste por Spotify Connect se usa el token `login5` del motor; si Spotify lo rechaza, cerrá sesión y entrá con el navegador.
 - "Agregar a la cola" todavía no está implementado: el motor no lo expone.
 - Sin descargas offline (como Spotifast).
 

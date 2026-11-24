@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.util.Base64;
 
 import com.spotifast.mobile.engine.NativeEngine;
+import com.spotifast.mobile.web.OAuthTokens;
 
 import org.json.JSONObject;
 
@@ -82,7 +83,7 @@ public final class SpotifyAuth {
                     main.post(new Runnable() {
                         @Override
                         public void run() {
-                            exchange(code, verifier, cb);
+                            exchange(ctx.getApplicationContext(), code, verifier, cb);
                         }
                     });
                 } catch (final Exception e) {
@@ -145,7 +146,7 @@ public final class SpotifyAuth {
     }
 
     /** El canje del código se hace por el motor (TLS propio): anda también en Android 4.4. */
-    private static void exchange(String code, String verifier, final Callback cb) {
+    private static void exchange(final Context ctx, String code, String verifier, final Callback cb) {
         String body = "grant_type=authorization_code&code=" + enc(code)
                 + "&redirect_uri=" + enc(REDIRECT) + "&client_id=" + CLIENT_ID
                 + "&code_verifier=" + enc(verifier);
@@ -165,7 +166,9 @@ public final class SpotifyAuth {
                             return;
                         }
                         try {
-                            cb.onToken(new JSONObject(text).getString("access_token"));
+                            JSONObject o = new JSONObject(text);
+                            OAuthTokens.save(ctx, o); // para la Web API (búsqueda/biblioteca)
+                            cb.onToken(o.getString("access_token"));
                         } catch (Exception e) {
                             cb.onError("Respuesta inválida de Spotify");
                         }
@@ -202,7 +205,7 @@ public final class SpotifyAuth {
         return Base64.encodeToString(b, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
     }
 
-    private static String enc(String s) {
+    public static String enc(String s) {
         try {
             return URLEncoder.encode(s, "UTF-8");
         } catch (Exception e) {

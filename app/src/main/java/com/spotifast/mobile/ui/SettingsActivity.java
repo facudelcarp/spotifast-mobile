@@ -83,6 +83,7 @@ public final class SettingsActivity extends Activity {
             public void onClick(View v) {
                 stopService(new Intent(SettingsActivity.this, PlayerService.class));
                 new File(getFilesDir(), "credentials.json").delete();
+                com.spotifast.mobile.web.OAuthTokens.clear(SettingsActivity.this);
                 finish();
             }
         });

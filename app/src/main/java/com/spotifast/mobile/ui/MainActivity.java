@@ -310,7 +310,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         empty.setText("Buscando…");
         adapter.set(new ArrayList<WebApi.Item>());
-        WebApi.get().search(q, results());
+        WebApi.get(this).search(q, results());
     }
 
     private void showLibrary() {
@@ -319,7 +319,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         empty.setText("Cargando biblioteca…");
         adapter.set(new ArrayList<WebApi.Item>());
-        WebApi.get().myPlaylists(EngineState.get().username, results());
+        WebApi.get(this).myPlaylists(EngineState.get().username, results());
     }
 
     private WebApi.Result results() {

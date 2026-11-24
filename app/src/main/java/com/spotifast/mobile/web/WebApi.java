@@ -46,9 +46,9 @@ public final class WebApi implements NativeEngine.Listener {
             "playlist-read-private,playlist-read-collaborative,user-library-read,user-read-private";
     private static WebApi instance;
 
-    public static WebApi get() {
+    public static WebApi get(android.content.Context c) {
         if (instance == null) {
-            instance = new WebApi();
+            instance = new WebApi(c.getApplicationContext());
             NativeEngine.addListener(instance);
         }
         return instance;
@@ -59,7 +59,10 @@ public final class WebApi implements NativeEngine.Listener {
     private String token;
     private long tokenExpiry;
 
-    private WebApi() {
+    private final android.content.Context app;
+
+    private WebApi(android.content.Context app) {
+        this.app = app;
     }
 
     public void search(String query, Result r) {
@@ -104,7 +107,9 @@ public final class WebApi implements NativeEngine.Listener {
             @Override
             public void onToken(final String tok, String error) {
                 if (tok == null) {
-                    r.onError(error == null ? "sin token" : error);
+                    // Mensaje corto: el detalle técnico va al log, no a la pantalla.
+                    android.util.Log.w("spotifast", "token Web API: " + error);
+                    r.onError("no hay permiso para buscar. Probá cerrar sesión y entrar de nuevo con el navegador.");
                     return;
                 }
                 JSONObject headers = new JSONObject();
@@ -119,8 +124,10 @@ public final class WebApi implements NativeEngine.Listener {
                             public void onResponse(int status, byte[] body) {
                                 if (status == 401) {
                                     token = null;
+                                    OAuthTokens.invalidate(app);
                                 }
                                 if (status < 200 || status >= 300) {
+                                    android.util.Log.w("spotifast", "Web API " + status + ": " + new String(body));
                                     r.onError(status == 0 ? "sin conexión" : "Web API " + status);
                                     return;
                                 }
@@ -137,14 +144,24 @@ public final class WebApi implements NativeEngine.Listener {
         });
     }
 
-    private void withToken(TokenCb cb) {
-        if (token != null && SystemClock.elapsedRealtime() < tokenExpiry) {
-            cb.onToken(token, null);
-            return;
-        }
-        int id = nextReq++;
-        pending.put(id, cb);
-        NativeEngine.requestToken(SCOPES, id);
+    /** Primero el token OAuth del login (permisos explícitos); si no hay, el del motor (login5). */
+    private void withToken(final TokenCb cb) {
+        OAuthTokens.get(app, new OAuthTokens.Cb() {
+            @Override
+            public void onToken(String oauth) {
+                if (oauth != null) {
+                    cb.onToken(oauth, null);
+                    return;
+                }
+                if (token != null && SystemClock.elapsedRealtime() < tokenExpiry) {
+                    cb.onToken(token, null);
+                    return;
+                }
+                int id = nextReq++;
+                pending.put(id, cb);
+                NativeEngine.requestToken(SCOPES, id);
+            }
+        });
     }
 
     @Override
