@@ -2,6 +2,22 @@ plugins {
     id "com.android.application"
 }
 
+// ---- Versión ---------------------------------------------------------------------------------
+// El release la toma del tag (v0.6.0 → -PappVersion=0.6.0). versionCode = mayor*10000 + menor*100 + parche,
+// así cada versión es mayor que la anterior y Android acepta instalarla encima.
+def appVersion = (project.findProperty("appVersion") ?: "0.6.0").toString()
+def appVersionCode = { String v ->
+    def p = v.tokenize("-")[0].tokenize(".").collect { it.toInteger() } + [0, 0, 0]
+    p[0] * 10000 + p[1] * 100 + p[2]
+}
+
+// ---- Firma -----------------------------------------------------------------------------------
+// Con keystore propio (variables de entorno, ver README → "Release") el APK siempre tiene la misma
+// firma y las actualizaciones se instalan encima. Sin keystore se usa la clave de debug de la
+// máquina: sirve para probar, pero cada máquina firma distinto.
+def keystorePath = System.getenv("SPOTIFAST_KEYSTORE")
+def hasReleaseKey = keystorePath != null && file(keystorePath).exists()
+
 android {
     namespace "com.spotifast.mobile"
     compileSdk 35
@@ -11,8 +27,8 @@ android {
         // Android 4.4 KitKat (2013). Los íconos vectoriales se convierten a PNG al compilar.
         minSdk 19
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode appVersionCode(appVersion)
+        versionName appVersion
         // Solo español/inglés: menos recursos dentro del APK.
         resourceConfigurations += ["es", "en"]
     }
@@ -20,14 +36,26 @@ android {
     // NDK r25: el último que puede generar binarios para Android 4.4 (API 19).
     ndkVersion "25.2.9519653"
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile file(keystorePath)
+                storePassword System.getenv("SPOTIFAST_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("SPOTIFAST_KEY_ALIAS")
+                keyPassword System.getenv("SPOTIFAST_KEY_PASSWORD") ?: System.getenv("SPOTIFAST_KEYSTORE_PASSWORD")
+                // v1 (JAR) para Android 4.4–6, v2 para 7+.
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            // Firma de debug para poder instalar el APK de CI directamente.
-            // Reemplazar por un keystore propio antes de publicar.
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
         }
     }
 

@@ -1,0 +1,98 @@
+name: Release
+
+# Publicar una versión:
+#   git tag v0.6.0 && git push origin v0.6.0
+# o a mano desde Actions → Release → Run workflow (con la versión).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión (ej. 0.6.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: 25.2.9519653
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versión
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Versión: $V"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Caché de dependencias de Gradle: evita los 429 de Maven Central.
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Android NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VERSION" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Rust + targets Android
+        run: |
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          cargo install cargo-ndk --locked
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/target
+          key: cargo-${{ hashFiles('native/Cargo.lock') }}
+
+      - name: Keystore de firma
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SPOTIFAST_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Falta el secret SPOTIFAST_KEYSTORE_BASE64. Sin keystore propio cada release se firmaría distinto y no se podría actualizar encima. Ver README → Release."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/spotifast.jks"
+          echo "SPOTIFAST_KEYSTORE=$RUNNER_TEMP/spotifast.jks" >> "$GITHUB_ENV"
+
+      - name: Compilar APKs firmados
+        env:
+          SPOTIFAST_KEYSTORE_PASSWORD: ${{ secrets.SPOTIFAST_KEYSTORE_PASSWORD }}
+          SPOTIFAST_KEY_ALIAS: ${{ secrets.SPOTIFAST_KEY_ALIAS }}
+          SPOTIFAST_KEY_PASSWORD: ${{ secrets.SPOTIFAST_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease -PappVersion=${{ steps.ver.outputs.version }} --no-daemon
+
+      - name: Renombrar y verificar firma
+        run: |
+          V=${{ steps.ver.outputs.version }}
+          mkdir -p dist
+          for f in app/build/outputs/apk/release/app-*-release.apk; do
+            abi=$(basename "$f" | sed -e 's/^app-//' -e 's/-release\.apk$//')
+            cp "$f" "dist/spotifast-$V-$abi.apk"
+          done
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "dist/spotifast-$V-universal.apk" | head -3
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          ls -la dist
+
+      - name: Crear release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Spotifast Mobile v${{ steps.ver.outputs.version }}
+          body_path: .github/release-notes.md
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
