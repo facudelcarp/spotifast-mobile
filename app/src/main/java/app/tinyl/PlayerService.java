@@ -1,4 +1,4 @@
-package com.spotifast.mobile;
+package app.tinyl;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -21,12 +21,12 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
 
-import com.spotifast.mobile.engine.AudioOut;
-import com.spotifast.mobile.engine.EngineState;
-import com.spotifast.mobile.engine.NativeEngine;
-import com.spotifast.mobile.media.MediaControls;
-import com.spotifast.mobile.ui.CoverLoader;
-import com.spotifast.mobile.ui.MainActivity;
+import app.tinyl.engine.AudioOut;
+import app.tinyl.engine.EngineState;
+import app.tinyl.engine.NativeEngine;
+import app.tinyl.media.MediaControls;
+import app.tinyl.ui.CoverLoader;
+import app.tinyl.ui.MainActivity;
 
 /**
  * Dueño del motor. Mientras suena: servicio en primer plano + wakelock parcial + wifilock
@@ -35,16 +35,16 @@ import com.spotifast.mobile.ui.MainActivity;
  */
 public final class PlayerService extends Service implements EngineState.Observer {
 
-    public static final String ACTION_START = "com.spotifast.START";
+    public static final String ACTION_START = "app.tinyl.START";
     public static final String EXTRA_TOKEN = "token";
-    private static final String ACTION_TOGGLE = "com.spotifast.TOGGLE";
-    private static final String ACTION_NEXT = "com.spotifast.NEXT";
-    private static final String ACTION_PREV = "com.spotifast.PREV";
-    private static final String ACTION_QUIT = "com.spotifast.QUIT";
-    private static final String ACTION_PAIR = "com.spotifast.PAIR";
-    private static final String ACTION_PAIR_CANCEL = "com.spotifast.PAIR_CANCEL";
-    private static final String ACTION_PREFETCH = "com.spotifast.PREFETCH";
-    private static final String ACTION_PREFETCH_CANCEL = "com.spotifast.PREFETCH_CANCEL";
+    private static final String ACTION_TOGGLE = "app.tinyl.TOGGLE";
+    private static final String ACTION_NEXT = "app.tinyl.NEXT";
+    private static final String ACTION_PREV = "app.tinyl.PREV";
+    private static final String ACTION_QUIT = "app.tinyl.QUIT";
+    private static final String ACTION_PAIR = "app.tinyl.PAIR";
+    private static final String ACTION_PAIR_CANCEL = "app.tinyl.PAIR_CANCEL";
+    private static final String ACTION_PREFETCH = "app.tinyl.PREFETCH";
+    private static final String ACTION_PREFETCH_CANCEL = "app.tinyl.PREFETCH_CANCEL";
     private static final int PREFETCH_NOTIF_ID = 2;
     private static final String CHANNEL = "playback";
     private static final int NOTIF_ID = 1;
@@ -143,13 +143,13 @@ public final class PlayerService extends Service implements EngineState.Observer
         NativeEngine.setAudioOut(audio);
 
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "spotifast:play");
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tinyl:play");
         wakeLock.setReferenceCounted(false);
         WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "spotifast:play");
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "tinyl:play");
         wifiLock.setReferenceCounted(false);
 
-        multicastLock = wm.createMulticastLock("spotifast:pair");
+        multicastLock = wm.createMulticastLock("tinyl:pair");
         multicastLock.setReferenceCounted(false);
         controls = MediaControls.create(this);
 
@@ -322,7 +322,7 @@ public final class PlayerService extends Service implements EngineState.Observer
     private void prefetchNotification(String text, int done, int total, boolean ongoing) {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
-        b.setSmallIcon(R.drawable.ic_note)
+        b.setSmallIcon(R.drawable.ic_stat_tinyl)
                 .setContentTitle("Precarga · " + prefetchTitle)
                 .setContentText(text)
                 .setOngoing(ongoing)
@@ -387,7 +387,12 @@ public final class PlayerService extends Service implements EngineState.Observer
         boolean changed = !s.uri.equals(lastMetaUri);
         lastMetaUri = s.uri;
         Bitmap art = prefs.eco() ? null : CoverLoader.cached(s.coverDefault);
-        controls.update(s, art, changed);
+        // Sin carátula (modo ahorro o todavía cargando): el logo en la pantalla bloqueada.
+        controls.update(s, art != null ? art : Brand.logo(this, 256), changed);
+    }
+
+    private int largeIconPx() {
+        return (int) (64 * getResources().getDisplayMetrics().density);
     }
 
     @SuppressWarnings("deprecation")
@@ -407,7 +412,15 @@ public final class PlayerService extends Service implements EngineState.Observer
         }
         Notification.Builder b = Build.VERSION.SDK_INT >= 26
                 ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
-        b.setSmallIcon(R.drawable.ic_note)
+        // Marca Tinyl en segundo plano: ícono propio en la barra de estado, "Tinyl · cliente liviano
+        // para Spotify" en el encabezado, color verde y el logo como imagen si no hay carátula.
+        Bitmap art = prefs.eco() ? null : CoverLoader.cached(s.coverDefault);
+        if (art == null) {
+            art = CoverLoader.cached(s.coverSmall);
+        }
+        b.setSmallIcon(R.drawable.ic_stat_tinyl)
+                .setLargeIcon(art != null ? art : Brand.logo(this, largeIconPx()))
+                .setSubText(getString(R.string.tagline))
                 .setContentTitle(s.title.length() == 0 ? getString(R.string.app_name) : s.title)
                 .setContentText(s.artist)
                 .setShowWhen(false)
@@ -419,6 +432,9 @@ public final class PlayerService extends Service implements EngineState.Observer
                 .addAction(playing ? R.drawable.ic_pause : R.drawable.ic_play,
                         getString(playing ? R.string.pause : R.string.play), service(ACTION_TOGGLE, 2))
                 .addAction(R.drawable.ic_next, getString(R.string.next), service(ACTION_NEXT, 3));
+        if (Build.VERSION.SDK_INT >= 21) {
+            b.setColor(getResources().getColor(R.color.accent));
+        }
         controls.decorate(b);
         if (Build.VERSION.SDK_INT < 26) {
             b.setPriority(Notification.PRIORITY_LOW);

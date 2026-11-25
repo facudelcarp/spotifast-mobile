@@ -1,4 +1,4 @@
-package com.spotifast.mobile.ui;
+package app.tinyl.ui;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -11,10 +11,10 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.spotifast.mobile.R;
-import com.spotifast.mobile.engine.EngineState;
-import com.spotifast.mobile.engine.NativeEngine;
-import com.spotifast.mobile.web.WebApi;
+import app.tinyl.R;
+import app.tinyl.engine.EngineState;
+import app.tinyl.engine.NativeEngine;
+import app.tinyl.web.WebApi;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,7 +70,7 @@ final class Browser {
     private final TextView title;
     private final View back;
     private final WebApi api;
-    private final com.spotifast.mobile.Prefs prefs;
+    private final app.tinyl.Prefs prefs;
     private final ArrayList<Page> stack = new ArrayList<>();
     private final Adapter adapter = new Adapter();
 
@@ -81,7 +81,7 @@ final class Browser {
         this.title = title;
         this.back = back;
         this.api = WebApi.get(activity);
-        this.prefs = new com.spotifast.mobile.Prefs(activity);
+        this.prefs = new app.tinyl.Prefs(activity);
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -543,7 +543,7 @@ final class Browser {
         int mb = (int) (uris.size() * 2.5f * prefs.bitrate() / 96f);
         Toast.makeText(activity, "Precargando " + uris.size() + " canciones (~" + mb
                 + " MB). Mirá el progreso en la notificación.", Toast.LENGTH_LONG).show();
-        com.spotifast.mobile.PlayerService.prefetch(activity, title, uris);
+        app.tinyl.PlayerService.prefetch(activity, title, uris);
     }
 
     /** Elegir una de tus playlists y agregarle la canción. */

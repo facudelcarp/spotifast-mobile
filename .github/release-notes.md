@@ -1,11 +1,13 @@
+**Tinyl · cliente liviano para Spotify.** Tu Spotify en una app de ~3 MB que entra en cualquier celular.
+
 ## ¿Qué APK bajo?
 
 | Archivo | Para |
 |---|---|
-| `spotifast-*-arm64-v8a.apk` | **Casi todos los celulares desde 2017** (recomendado) |
-| `spotifast-*-armeabi-v7a.apk` | Celulares viejos o de 32 bits (Android 4.4–7) |
-| `spotifast-*-x86.apk` / `x86_64.apk` | Intel Atom y emuladores de PC |
-| `spotifast-*-universal.apk` | Cualquiera (más pesado, trae todos) |
+| `tinyl-*-arm64-v8a.apk` | **Casi todos los celulares desde 2017** (recomendado) |
+| `tinyl-*-armeabi-v7a.apk` | Celulares viejos o de 32 bits (Android 4.4–7) |
+| `tinyl-*-x86.apk` / `x86_64.apk` | Intel Atom y emuladores de PC |
+| `tinyl-*-universal.apk` | Cualquiera (más pesado, trae todos) |
 
 Requiere **Android 4.4 o superior** y **Spotify Premium**.
 
@@ -20,4 +22,4 @@ Requiere **Android 4.4 o superior** y **Spotify Premium**.
 
 Ver [CHANGELOG.md](https://github.com/facudelcarp/spotifast-mobile/blob/main/CHANGELOG.md).
 
-`SHA256SUMS.txt` tiene los hashes para verificar las descargas. No afiliado a Spotify.
+`SHA256SUMS.txt` tiene los hashes para verificar las descargas. Tinyl no está afiliado a Spotify AB.

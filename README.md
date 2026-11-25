@@ -1,6 +1,7 @@
-# Spotifast Mobile
+# Tinyl
 
-Cliente de Spotify **liviano** para Android, inspirado en [Spotifast](https://github.com/crmne/spotifast).
+**Tinyl · cliente liviano para Spotify** en Android. No es otro reproductor: es tu Spotify (tu cuenta, tus playlists, tu biblioteca) en una app que entra en cualquier celular.
+Inspirado en [Spotifast](https://github.com/crmne/spotifast), el cliente liviano de escritorio.
 Corre **solo en el teléfono**: sin PC, sin la app oficial y sin apps auxiliares. APK de unos 3 MB.
 
 - Android **4.4 KitKat (API 19) en adelante**: ARM de 32/64 bits y x86 de 32/64 bits (Intel Atom).
@@ -28,9 +29,9 @@ alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PU
 ## Login
 
 1. **Navegador** (normal): OAuth PKCE con un servidor local en `127.0.0.1:8898`.
-2. **Otro dispositivo (Spotify Connect)**: para teléfonos cuyo navegador no puede abrir la página de Spotify. El teléfono se anuncia en la Wi-Fi (mDNS). En cualquier otra app de Spotify de la misma red se elige «Spotifast …» una sola vez, y esa app le pasa la sesión. Es el mismo mecanismo con el que se empareja Soloist.
+2. **Otro dispositivo (Spotify Connect)**: para teléfonos cuyo navegador no puede abrir la página de Spotify. El teléfono se anuncia en la Wi-Fi (mDNS). En cualquier otra app de Spotify de la misma red se elige «Tinyl …» una sola vez, y esa app le pasa la sesión. Es el mismo mecanismo con el que se empareja Soloist.
 
-librespot está parcheado (`native/vendor/librespot-core`, ver "SPOTIFAST PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
+librespot está parcheado (`native/vendor/librespot-core`, ver "TINYL PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
 
 ## Funciones
 
@@ -54,7 +55,7 @@ Igual que Spotifast, la Web API usa **tu propia app de Spotify**. Con el client 
 1. En [Spotify for Developers](https://developer.spotify.com/dashboard) tocá **Create app** (la cuenta necesita Premium).
 2. Redirect URI: `http://127.0.0.1:8989/login`
 3. Tildá **Web API** y guardá.
-4. En Spotifast: ⋮ → Ajustes → pegá el **Client ID** → **Autorizar**.
+4. En Tinyl: ⋮ → Ajustes → pegá el **Client ID** → **Autorizar**.
 
 Orden de tokens: app propia → token del login de reproducción → token `login5` del motor.
 Ante un 429 se respeta `Retry-After` y no se reintenta.
@@ -101,7 +102,7 @@ Ante un 429 se respeta `Retry-After` y no se reintenta.
 
 1. Instalá el APK que corresponda a tu teléfono. Si no sabés cuál, usá `app-universal-release.apk`.
 2. Tocá **Iniciar sesión con Spotify**. Se abre el navegador una sola vez y la sesión queda guardada.
-3. Buscá, abrí la biblioteca o **compartí cualquier enlace de Spotify** a Spotifast para reproducirlo.
+3. Buscá, abrí la biblioteca o **compartí cualquier enlace de Spotify** a Tinyl para reproducirlo.
 4. El teléfono también aparece como dispositivo Spotify Connect en tus otras apps de Spotify.
 
 ## Compilar
@@ -161,6 +162,10 @@ El Release queda con un APK por procesador, el universal y `SHA256SUMS.txt`. La 
 - librespot no es oficial. Spotify cambió su protocolo varias veces y a veces lo rompe temporalmente.
 - Sin app propia, la búsqueda depende del client ID compartido y Spotify la limita (429). Ver "Búsqueda y biblioteca".
 - "Agregar a la cola" todavía no está implementado: el motor no lo expone.
-- Sin descargas offline (como Spotifast).
+- Sin modo sin conexión (como Spotifast): la precarga ahorra datos pero sigue necesitando señal.
+
+## Nombre y marca
+
+Tinyl (tiny + vinyl) es un nombre propio para no usar "Spotify" ni "Spoti-", que la marca de Spotify no permite a apps de terceros. Tinyl no está afiliado a Spotify AB; "Spotify" se usa solo para describir con qué funciona.
 
 No afiliado a Spotify.

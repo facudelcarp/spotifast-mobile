@@ -1,8 +1,8 @@
-package com.spotifast.mobile.web;
+package app.tinyl.web;
 
 import android.os.SystemClock;
 
-import com.spotifast.mobile.engine.NativeEngine;
+import app.tinyl.engine.NativeEngine;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -736,7 +736,7 @@ public final class WebApi implements NativeEngine.Listener {
             public void onToken(final String tok, final boolean personal, String error) {
                 if (tok == null) {
                     // Mensaje corto: el detalle técnico va al log, no a la pantalla.
-                    android.util.Log.w("spotifast", "token Web API: " + error);
+                    android.util.Log.w("tinyl", "token Web API: " + error);
                     res.fail("no hay permiso para la Web API. Configurá tu app de Spotify en Ajustes.");
                     return;
                 }
@@ -770,7 +770,7 @@ public final class WebApi implements NativeEngine.Listener {
                             }
                         }
                         if (status < 200 || status >= 300) {
-                            android.util.Log.w("spotifast", method + " " + path + " → " + status + ": "
+                            android.util.Log.w("tinyl", method + " " + path + " → " + status + ": "
                                     + new String(body));
                             res.fail(status == 0 ? "sin conexión"
                                     : status == 403 ? "Spotify no dio permiso. Volvé a tocar Autorizar en Ajustes."
@@ -796,7 +796,7 @@ public final class WebApi implements NativeEngine.Listener {
     private static String rateLimitMessage(boolean shared, long secs) {
         return shared
                 ? "Spotify limitó la app compartida (reintentá en " + secs + " s). Para que no pase, "
-                  + "configurá tu propia app de Spotify en Ajustes, como en Spotifast."
+                  + "configurá tu propia app de Spotify en Ajustes."
                 : "Spotify pidió esperar " + secs + " s antes de seguir.";
     }
 

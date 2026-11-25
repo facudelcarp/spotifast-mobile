@@ -1,11 +1,11 @@
-package com.spotifast.mobile;
+package app.tinyl;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.view.KeyEvent;
 
-import com.spotifast.mobile.engine.NativeEngine;
+import app.tinyl.engine.NativeEngine;
 
 /** Botones de auriculares/Bluetooth en Android 4.4 (en 5+ los maneja MediaSession). */
 public final class MediaButtonReceiver extends BroadcastReceiver {

@@ -1,4 +1,4 @@
-//! Motor de reproducción de Spotifast Mobile.
+//! Motor de reproducción de Tinyl (cliente liviano para Spotify).
 //!
 //! Corre librespot dentro del proceso de la app (sin PC y sin otras apps) y expone a Java
 //! el mismo protocolo JSON que la API WebSocket de Spotify Soloist:
@@ -119,7 +119,7 @@ fn runtime() -> &'static tokio::runtime::Runtime {
         // Dos hilos alcanzan: el trabajo pesado (decodificar) ocurre en el hilo propio del Player.
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
-            .thread_name("spotifast-rt")
+            .thread_name("tinyl-rt")
             .enable_all()
             .build()
             .expect("no se pudo crear el runtime")
@@ -638,7 +638,7 @@ fn jstr(env: &mut JNIEnv, s: &JString) -> String {
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeInit(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeInit(
     env: JNIEnv,
     class: JClass,
 ) {
@@ -646,7 +646,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeInit(
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Info)
-            .with_tag("spotifast"),
+            .with_tag("tinyl"),
     );
     if VM.get().is_none() {
         if let Ok(vm) = env.get_java_vm() {
@@ -662,7 +662,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeInit(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHasCredentials(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeHasCredentials(
     mut env: JNIEnv,
     _class: JClass,
     data_dir: JString,
@@ -676,7 +676,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHasCr
 
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStart(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeStart(
     mut env: JNIEnv,
     _class: JClass,
     data_dir: JString,
@@ -702,7 +702,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStart
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStop(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeStop(
     _env: JNIEnv,
     _class: JClass,
 ) {
@@ -713,7 +713,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStop(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeCommand(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeCommand(
     mut env: JNIEnv,
     _class: JClass,
     json_text: JString,
@@ -723,7 +723,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeComma
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeRequestToken(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeRequestToken(
     mut env: JNIEnv,
     _class: JClass,
     scopes: JString,
@@ -735,7 +735,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeReque
 
 #[no_mangle]
 #[allow(clippy::too_many_arguments)]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStartPairing(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeStartPairing(
     mut env: JNIEnv,
     _class: JClass,
     data_dir: JString,
@@ -764,7 +764,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStart
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStopPairing(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeStopPairing(
     _env: JNIEnv,
     _class: JClass,
 ) {
@@ -772,7 +772,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStopP
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHttp(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeHttp(
     mut env: JNIEnv,
     _class: JClass,
     method: JString,
@@ -790,7 +790,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHttp(
 
 /// Precarga de pistas a la caché (ver prefetch.rs). `uris_json`: arreglo JSON de URIs de pistas.
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativePrefetch(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativePrefetch(
     mut env: JNIEnv,
     _class: JClass,
     uris_json: JString,
@@ -808,7 +808,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativePrefe
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativePrefetchCancel(
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativePrefetchCancel(
     _env: JNIEnv,
     _class: JClass,
 ) {

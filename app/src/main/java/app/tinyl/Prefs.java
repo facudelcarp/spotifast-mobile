@@ -1,4 +1,4 @@
-package com.spotifast.mobile;
+package app.tinyl;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -12,11 +12,11 @@ public final class Prefs {
     private final SharedPreferences p;
 
     public Prefs(Context c) {
-        p = c.getSharedPreferences("spotifast", Context.MODE_PRIVATE);
+        p = c.getSharedPreferences("tinyl", Context.MODE_PRIVATE);
     }
 
     public String deviceName() {
-        return p.getString("device_name", "Spotifast " + Build.MODEL);
+        return p.getString("device_name", "Tinyl " + Build.MODEL);
     }
 
     public void setDeviceName(String v) {

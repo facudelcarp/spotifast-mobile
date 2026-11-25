@@ -1,4 +1,4 @@
-package com.spotifast.mobile.ui;
+package app.tinyl.ui;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -7,7 +7,7 @@ import android.os.Looper;
 import android.util.LruCache;
 import android.widget.ImageView;
 
-import com.spotifast.mobile.engine.NativeEngine;
+import app.tinyl.engine.NativeEngine;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

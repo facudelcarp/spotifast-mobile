@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Spotifast" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Tinyl" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/bg</item>
         <item name="android:colorPrimaryDark">@color/bg</item>
         <item name="android:colorAccent">@color/accent</item>

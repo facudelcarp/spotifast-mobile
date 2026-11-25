@@ -44,5 +44,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: spotifast-apks
+          name: tinyl-apks
           path: app/build/outputs/apk/release/*.apk
