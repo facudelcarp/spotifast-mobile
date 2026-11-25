@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Spotifast</string>
+    <string name="settings">Ajustes</string>
+    <string name="channel_playback">Reproducción</string>
+    <string name="play">Reproducir</string>
+    <string name="pause">Pausar</string>
+    <string name="next">Siguiente</string>
+    <string name="prev">Anterior</string>
+    <string name="shuffle">Aleatorio</string>
+    <string name="repeat">Repetir</string>
+    <string name="library">Biblioteca</string>
+    <string name="search">Buscar</string>
+    <string name="search_hint">Buscar o pegar enlace de Spotify</string>
+    <string name="login">Iniciar sesión con Spotify</string>
+    <string name="login_note">Requiere Spotify Premium. Se abre el navegador una sola vez; después el teléfono recuerda la sesión.</string>
+    <string name="logout">Cerrar sesión</string>
+    <string name="device_name">Nombre del dispositivo</string>
+    <string name="quality">Calidad de audio</string>
+    <string name="eco">Modo ahorro (sin carátulas)</string>
+    <string name="cache">Caché de audio (MB, 0 = sin límite)</string>
+    <string name="idle">Apagar motor tras N minutos en pausa</string>
+    <string name="save">Guardar</string>
+</resources>

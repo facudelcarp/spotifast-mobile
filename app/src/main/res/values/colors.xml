@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Negro puro: en pantallas OLED los píxeles negros están apagados (menos batería). -->
+    <color name="bg">#000000</color>
+    <color name="panel">#0A0F0B</color>
+    <color name="panel_edge">#1C2A20</color>
+    <color name="accent">#1ED760</color>
+    <color name="accent_dim">#0F6B30</color>
+    <color name="text">#E6E6E6</color>
+    <color name="muted">#7A8A7E</color>
+    <color name="lcd">#1ED760</color>
+    <color name="error">#FF5A5A</color>
+</resources>

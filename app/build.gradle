@@ -17,6 +17,8 @@ android {
         resourceConfigurations += ["es", "en"]
     }
 
+    ndkVersion "27.2.12479018"
+
     buildTypes {
         release {
             minifyEnabled true
@@ -36,7 +38,35 @@ android {
     lint {
         abortOnError false
     }
+
+    // Un APK por arquitectura: cada teléfono baja solo su motor nativo (~3 MB en vez de ~9 MB).
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a", "x86_64"
+            universalApk true
+        }
+    }
 }
+
+// ---- Motor nativo (Rust + librespot) ------------------------------------------------------
+// Compila native/ con cargo-ndk y deja libspotifast.so en src/main/jniLibs.
+// Saltear con -PskipRust si las .so ya están compiladas (p. ej. en un paso previo de CI).
+def ndkDir = android.ndkDirectory
+tasks.register("cargoBuild", Exec) {
+    group = "build"
+    description = "Compila el motor librespot para Android"
+    workingDir rootProject.file("native")
+    environment "ANDROID_NDK_HOME", ndkDir.absolutePath
+    commandLine "cargo", "ndk",
+            "-t", "armeabi-v7a", "-t", "arm64-v8a", "-t", "x86_64",
+            "-P", "21",
+            "-o", file("src/main/jniLibs").absolutePath,
+            "build", "--release"
+    onlyIf { !project.hasProperty("skipRust") }
+}
+tasks.named("preBuild") { dependsOn "cargoBuild" }
 
 dependencies {
     // OkHttp 3.12.x: última rama compatible con Android viejo y sin Kotlin stdlib (APK chico).
