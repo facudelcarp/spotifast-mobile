@@ -58,9 +58,19 @@ public final class AudioOut {
         }
     }
 
+    private float duck = 1f, fade = 1f;
+
     /** Para "ducking" cuando otra app pide foco de audio transitorio. */
-    public synchronized void setDuck(boolean duck) {
-        volume = duck ? 0.25f : 1f;
+    public synchronized void setDuck(boolean on) {
+        duck = on ? 0.25f : 1f;
+        volume = duck * fade;
+        applyVolume();
+    }
+
+    /** Fundido del temporizador para dormir (1 = normal, 0 = silencio). */
+    public synchronized void setFade(float f) {
+        fade = Math.max(0f, Math.min(1f, f));
+        volume = duck * fade;
         applyVolume();
     }
 

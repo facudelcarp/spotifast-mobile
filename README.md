@@ -38,10 +38,14 @@ librespot está parcheado (`native/vendor/librespot-core`, ver "TINYL PATCH") pa
 Inspirada en la app oficial, pero pensada para gama baja (un solo ListView por pantalla, sin carruseles ni GridView anidados):
 
 - **Barra inferior**: Inicio · Buscar · Tu biblioteca · Crear.
-- **Inicio**: saludo + grilla de accesos a lo último que escuchaste (de tu historial) + canciones recientes.
+- **Inicio** con tu foto, filtros Todo / Música / Podcasts, accesos a lo último que escuchaste, tus artistas del momento y canciones recientes.
 - **Buscar**: búsquedas recientes guardadas en el teléfono (cero red) y resultados por Canciones, Artistas, Álbumes y Playlists. También acepta enlaces de Spotify, pegados o compartidos.
 - **Tu biblioteca** con filtros Playlists / Álbumes / Artistas y "Tus me gusta" arriba.
 - **Playlist, álbum y artista** con Reproducir y Aleatorio. Al tocar una canción, el contexto arranca desde ahí.
+- **Letras sincronizadas**: las de Spotify (como Spotifast) y, si no hay, las de [LRCLIB](https://lrclib.net). Vista previa en Sonando, letra completa que sigue la canción, tocar una línea salta a ese momento. Se guardan 30 días en el teléfono.
+- **Spotify Connect**: elegí dónde suena (este teléfono, la PC, un parlante, la TV) y traela de vuelta con un toque.
+- **Temporizador para dormir**: 15/30/45/60 minutos o al terminar la canción, con fundido de 8 s.
+- **Podcasts**: tus podcasts y episodios, "Seguir escuchando" y retomar donde quedaste; también en la búsqueda.
 - **Precargar** una playlist, álbum o Tus me gusta con Wi-Fi: el audio queda en la caché (cifrado, como al escucharlo) y después casi no gasta datos. Sigue necesitando conexión para la clave de cada canción: no es modo sin conexión ni evita la protección de Spotify.
 - **Crear playlist** y **Agregar a una playlist** desde el menú de cualquier canción (mantener apretado).
 - **Mini reproductor** flotante teñido con el color de la carátula (calculado de la miniatura de 64 px), con ♥ y play.

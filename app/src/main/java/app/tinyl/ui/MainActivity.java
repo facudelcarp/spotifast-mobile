@@ -52,6 +52,17 @@ public final class MainActivity extends Activity implements EngineState.Observer
     private static final int TAB_HOME = 0, TAB_SEARCH = 1, TAB_LIBRARY = 2;
     private int tab = -1;
     private String libraryFilter = "playlists";
+    private String homeFilter = "all";
+    private ImageView avatar;
+    private View homeChips, lyricsCard, lyricsView;
+    private TextView lyricNow, lyricNext, lyricsTitle, lyricsSource;
+    private ListView lyricsList;
+    private LyricsAdapter lyricsAdapter;
+    /** Letra de la canción actual (null = no hay / todavía no se pidió). */
+    private app.tinyl.lyrics.Lyrics lyrics;
+    private String lyricsUri;
+    private int lyricActive = -2;
+    private long lyricsTouchedAt;
     private int miniColor;
     private View mini, nowPlaying;
     private ImageView miniCover;
@@ -72,7 +83,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
         public void run() {
             updateClock(EngineState.get());
             if (EngineState.get().isPlaying()) {
-                handler.postDelayed(this, 1000);
+                // 1 vez por segundo; con la letra a la vista, 3 por segundo para seguir el canto.
+                handler.postDelayed(this, lyricsView.getVisibility() == View.VISIBLE ? 300 : 1000);
             }
         }
     };
@@ -141,17 +153,100 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 createPlaylist();
             }
         });
-        for (final String[] chip : new String[][]{{"playlists", ""}, {"albums", ""}, {"artists", ""}}) {
-            int id = "playlists".equals(chip[0]) ? R.id.chip_playlists
-                    : "albums".equals(chip[0]) ? R.id.chip_albums : R.id.chip_artists;
-            click(id, new Runnable() {
+        final String[] libKeys = {"playlists", "albums", "artists", "shows"};
+        final int[] libIds = {R.id.chip_playlists, R.id.chip_albums, R.id.chip_artists, R.id.chip_shows};
+        for (int i = 0; i < libKeys.length; i++) {
+            final String key = libKeys[i];
+            click(libIds[i], new Runnable() {
                 @Override
                 public void run() {
-                    libraryFilter = chip[0];
+                    libraryFilter = key;
                     showTab(TAB_LIBRARY);
                 }
             });
         }
+        final String[] homeKeys = {"all", "music", "podcasts"};
+        final int[] homeIds = {R.id.chip_all, R.id.chip_music, R.id.chip_podcasts};
+        for (int i = 0; i < homeKeys.length; i++) {
+            final String key = homeKeys[i];
+            click(homeIds[i], new Runnable() {
+                @Override
+                public void run() {
+                    homeFilter = key;
+                    showTab(TAB_HOME);
+                }
+            });
+        }
+        avatar = (ImageView) findViewById(R.id.avatar);
+        Round.clip(avatar, -1);
+        browser.setAvatar(avatar);
+        homeChips = findViewById(R.id.home_chips);
+        lyricsCard = findViewById(R.id.lyrics_card);
+        lyricsView = findViewById(R.id.lyrics_view);
+        lyricNow = (TextView) findViewById(R.id.lyric_now);
+        lyricNext = (TextView) findViewById(R.id.lyric_next);
+        lyricsTitle = (TextView) findViewById(R.id.lyrics_title);
+        lyricsSource = (TextView) findViewById(R.id.lyrics_source);
+        lyricsList = (ListView) findViewById(R.id.lyrics_list);
+        lyricsAdapter = new LyricsAdapter();
+        lyricsList.setAdapter(lyricsAdapter);
+        lyricsList.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                // Tocar una línea sincronizada salta a ese momento de la canción.
+                if (lyrics != null && lyrics.synced && pos < lyrics.lines.size()) {
+                    NativeEngine.command("seek", "position_ms", lyrics.lines.get(pos).atMs);
+                }
+            }
+        });
+        lyricsList.setOnScrollListener(new android.widget.AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(android.widget.AbsListView v, int state) {
+                if (state != SCROLL_STATE_IDLE) {
+                    lyricsTouchedAt = android.os.SystemClock.elapsedRealtime(); // no pelearle al dedo
+                }
+            }
+
+            @Override
+            public void onScroll(android.widget.AbsListView v, int a, int b, int c) {
+            }
+        });
+        click(R.id.lyrics_card, new Runnable() {
+            @Override
+            public void run() {
+                showLyrics(true);
+            }
+        });
+        click(R.id.lyrics_close, new Runnable() {
+            @Override
+            public void run() {
+                showLyrics(false);
+            }
+        });
+        click(R.id.avatar, new Runnable() {
+            @Override
+            public void run() {
+                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+            }
+        });
+        click(R.id.mini_device, new Runnable() {
+            @Override
+            public void run() {
+                pickDevice();
+            }
+        });
+        click(R.id.np_devices, new Runnable() {
+            @Override
+            public void run() {
+                pickDevice();
+            }
+        });
+        click(R.id.np_timer, new Runnable() {
+            @Override
+            public void run() {
+                pickSleep();
+            }
+        });
         click(R.id.mini_like, new Runnable() {
             @Override
             public void run() {
@@ -251,12 +346,6 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 submitQuery();
             }
         });
-        click(R.id.btn_settings, new Runnable() {
-            @Override
-            public void run() {
-                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
-            }
-        });
         click(R.id.btn_login, new Runnable() {
             @Override
             public void run() {
@@ -327,6 +416,15 @@ public final class MainActivity extends Activity implements EngineState.Observer
     }
 
     static final int DEMO_HOME = 0, DEMO_SEARCH = 1, DEMO_LIBRARY = 2;
+
+    /** Modo demo: letra de ejemplo para revisar la pantalla sin cuenta. */
+    void demoLyrics(app.tinyl.lyrics.Lyrics l) {
+        lyricsUri = EngineState.get().uri;
+        lyrics = l;
+        lyricsCard.setVisibility(View.VISIBLE);
+        lyricsSource.setText("Letra: demo · sincronizada");
+        lyricsAdapter.notifyDataSetChanged();
+    }
 
     void demoTab(int t) {
         styleTab(t);
@@ -461,7 +559,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 browser.showLibrary(libraryFilter);
                 break;
             default:
-                browser.showHome();
+                browser.showHome(homeFilter);
         }
     }
 
@@ -470,6 +568,9 @@ public final class MainActivity extends Activity implements EngineState.Observer
         tab = t;
         searchBar.setVisibility(t == TAB_SEARCH ? View.VISIBLE : View.GONE);
         chips.setVisibility(t == TAB_LIBRARY ? View.VISIBLE : View.GONE);
+        homeChips.setVisibility(t == TAB_HOME ? View.VISIBLE : View.GONE);
+        // "Baño" de color tenue arriba del Inicio (un gradiente: no cuesta nada dibujarlo).
+        findViewById(R.id.main_column).setBackgroundResource(t == TAB_HOME ? R.drawable.home_wash : 0);
         if (t != TAB_SEARCH) {
             hideKeyboard();
         }
@@ -482,11 +583,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
             ((ImageView) findViewById(nav[i][0])).setColorFilter(c);
             ((TextView) findViewById(nav[i][1])).setTextColor(c);
         }
-        int[] chipIds = {R.id.chip_playlists, R.id.chip_albums, R.id.chip_artists};
-        String[] keys = {"playlists", "albums", "artists"};
+        int[] chipIds = {R.id.chip_playlists, R.id.chip_albums, R.id.chip_artists, R.id.chip_shows,
+                R.id.chip_all, R.id.chip_music, R.id.chip_podcasts};
+        String[] keys = {"playlists", "albums", "artists", "shows", "all", "music", "podcasts"};
         for (int i = 0; i < chipIds.length; i++) {
             TextView c = (TextView) findViewById(chipIds[i]);
-            boolean on = keys[i].equals(libraryFilter);
+            boolean on = keys[i].equals(i < 4 ? libraryFilter : homeFilter);
             c.setBackgroundResource(on ? R.drawable.tab_on : R.drawable.tab_off);
             c.setTextColor(getResources().getColor(on ? R.color.bg : R.color.text));
         }
@@ -525,6 +627,297 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 .show();
     }
 
+    // ------------------------------------------------------------------ letras
+
+    private void loadLyrics(final EngineState s) {
+        if (s.uri.equals(lyricsUri) || !s.loggedIn) {
+            return;
+        }
+        lyricsUri = s.uri;
+        lyrics = null;
+        lyricActive = -2;
+        lyricsCard.setVisibility(View.GONE);
+        lyricsAdapter.notifyDataSetChanged();
+        app.tinyl.lyrics.Lyrics.load(this, s.uri, s.coverDefault != null ? s.coverDefault : s.coverSmall,
+                s.title, s.artist, s.album, s.durationMs, new app.tinyl.lyrics.Lyrics.Cb() {
+                    @Override
+                    public void onLyrics(String uri, app.tinyl.lyrics.Lyrics l, String source) {
+                        if (!uri.equals(lyricsUri)) {
+                            return; // ya cambió la canción
+                        }
+                        lyrics = l;
+                        lyricActive = -2;
+                        lyricsCard.setVisibility(l == null ? View.GONE : View.VISIBLE);
+                        lyricsSource.setText(l == null ? "" : "Letra: " + source
+                                + (l.synced ? " · sincronizada" : ""));
+                        lyricsAdapter.notifyDataSetChanged();
+                        updateLyric(EngineState.get().positionNow());
+                    }
+                });
+    }
+
+    private void showLyrics(boolean show) {
+        if (show && lyrics == null) {
+            return;
+        }
+        lyricsView.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            EngineState s = EngineState.get();
+            lyricsTitle.setText(s.title + (s.artist.length() > 0 ? " · " + s.artist : ""));
+            lyricActive = -2;
+            lyricsTouchedAt = 0;
+            updateLyric(s.positionNow());
+            handler.removeCallbacks(tick);
+            if (s.isPlaying()) {
+                handler.post(tick);
+            }
+        }
+    }
+
+    /** Actualiza la vista previa y, si está abierta, resalta y sigue la línea que se canta. */
+    private void updateLyric(long pos) {
+        if (lyrics == null) {
+            return;
+        }
+        int a = lyrics.activeLine(pos);
+        if (a == lyricActive) {
+            return;
+        }
+        lyricActive = a;
+        if (lyrics.synced) {
+            int cur = Math.max(0, a);
+            lyricNow.setText(lyrics.lines.get(cur).text);
+            lyricNext.setText(cur + 1 < lyrics.lines.size() ? lyrics.lines.get(cur + 1).text : "");
+        } else {
+            lyricNow.setText(lyrics.lines.get(0).text);
+            lyricNext.setText(lyrics.lines.size() > 1 ? lyrics.lines.get(1).text : "");
+        }
+        if (lyricsView.getVisibility() == View.VISIBLE) {
+            lyricsAdapter.notifyDataSetChanged();
+            boolean userScrolling = android.os.SystemClock.elapsedRealtime() - lyricsTouchedAt < 4000;
+            if (a >= 0 && !userScrolling) {
+                lyricsList.smoothScrollToPositionFromTop(a, lyricsList.getHeight() / 3, 300);
+            }
+        }
+    }
+
+    private final class LyricsAdapter extends android.widget.BaseAdapter {
+        @Override
+        public int getCount() {
+            return lyrics == null ? 0 : lyrics.lines.size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return lyrics.lines.get(i);
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return i;
+        }
+
+        @Override
+        public View getView(int i, View v, android.view.ViewGroup parent) {
+            if (v == null) {
+                v = getLayoutInflater().inflate(R.layout.item_lyric, parent, false);
+            }
+            TextView t = (TextView) v;
+            t.setText(lyrics.lines.get(i).text);
+            int color;
+            if (!lyrics.synced) {
+                color = R.color.text;
+            } else if (i == lyricActive) {
+                color = R.color.accent; // la línea que se canta
+            } else {
+                color = i < lyricActive ? R.color.muted : R.color.text;
+            }
+            t.setTextColor(getResources().getColor(color));
+            t.setAlpha(lyrics.synced && i > lyricActive + 0 && i != lyricActive ? 0.55f : 1f);
+            return v;
+        }
+    }
+
+    // ------------------------------------------------------------------ Spotify Connect
+
+    /** Elegir dónde suena: este teléfono u otro dispositivo de tu cuenta (PC, parlante, TV…). */
+    private void pickDevice() {
+        if (!EngineState.get().loggedIn) {
+            return;
+        }
+        final ProgressToast wait = new ProgressToast("Buscando dispositivos…");
+        WebApi.get(this).devices(new WebApi.Devices() {
+            @Override
+            public void onDevices(final List<WebApi.Device> found, String error) {
+                wait.cancel();
+                if (error != null) {
+                    Toast.makeText(MainActivity.this, error, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                final String me = prefs.deviceName();
+                final List<WebApi.Device> list = new ArrayList<>(found);
+                android.widget.BaseAdapter adapter = new android.widget.BaseAdapter() {
+                    @Override
+                    public int getCount() {
+                        return list.size();
+                    }
+
+                    @Override
+                    public Object getItem(int i) {
+                        return list.get(i);
+                    }
+
+                    @Override
+                    public long getItemId(int i) {
+                        return i;
+                    }
+
+                    @Override
+                    public View getView(int i, View v, android.view.ViewGroup parent) {
+                        if (v == null) {
+                            v = getLayoutInflater().inflate(R.layout.item_result, parent, false);
+                        }
+                        WebApi.Device d = list.get(i);
+                        boolean mine = d.name.equals(me);
+                        TextView t1 = (TextView) v.findViewById(android.R.id.text1);
+                        TextView t2 = (TextView) v.findViewById(android.R.id.text2);
+                        ImageView icon = (ImageView) v.findViewById(android.R.id.icon);
+                        t1.setText(mine ? "Este teléfono" : d.name);
+                        t1.setTextColor(getResources().getColor(d.active ? R.color.accent : R.color.text));
+                        t2.setText(d.active ? "Sonando acá" : mine ? d.name : deviceType(d.type));
+                        String ty = d.type.toLowerCase(java.util.Locale.US);
+                        icon.setImageResource(ty.contains("computer") ? R.drawable.ic_computer
+                                : ty.contains("tv") || ty.contains("cast") ? R.drawable.ic_tv
+                                : ty.contains("smartphone") || ty.contains("tablet") ? R.drawable.ic_phone
+                                : R.drawable.ic_devices);
+                        int p = (int) (12 * getResources().getDisplayMetrics().density);
+                        icon.setPadding(p, p, p, p);
+                        icon.setColorFilter(getResources().getColor(d.active ? R.color.accent : R.color.muted));
+                        return v;
+                    }
+                };
+                if (list.isEmpty()) {
+                    Toast.makeText(MainActivity.this,
+                            "No hay otros dispositivos con Spotify abierto en tu cuenta", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                        .setTitle(R.string.devices)
+                        .setAdapter(adapter, new android.content.DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(android.content.DialogInterface dlg, int which) {
+                                transferTo(list.get(which), list.get(which).name.equals(me));
+                            }
+                        })
+                        .show();
+            }
+        });
+    }
+
+    private static String deviceType(String t) {
+        switch (t.toLowerCase(java.util.Locale.US)) {
+            case "computer":
+                return "Computadora";
+            case "smartphone":
+                return "Celular";
+            case "tablet":
+                return "Tablet";
+            case "speaker":
+                return "Parlante";
+            case "tv":
+                return "TV";
+            case "castvideo":
+            case "castaudio":
+                return "Google Cast";
+            default:
+                return "Spotify Connect";
+        }
+    }
+
+    private void transferTo(final WebApi.Device d, final boolean mine) {
+        WebApi.get(this).transfer(d.id, new WebApi.Done() {
+            @Override
+            public void onDone(boolean ok, String message) {
+                if (!ok && mine) {
+                    NativeEngine.command("activate"); // traerla acá aunque la Web API no responda
+                    NativeEngine.command("play");
+                    ok = true;
+                }
+                if (!ok) {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                EngineState s = EngineState.get();
+                s.remoteDevice = mine ? "" : d.name;
+                s.changed();
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------ temporizador
+
+    private void pickSleep() {
+        final EngineState s = EngineState.get();
+        final boolean on = s.sleepAt > 0 || s.sleepEndOfTrack;
+        final String[] labels = on
+                ? new String[]{"Apagar temporizador", "15 minutos", "30 minutos", "45 minutos", "1 hora", "Al terminar esta canción"}
+                : new String[]{"15 minutos", "30 minutos", "45 minutos", "1 hora", "Al terminar esta canción"};
+        final int[] minutes = on ? new int[]{0, 15, 30, 45, 60, -1} : new int[]{15, 30, 45, 60, -1};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.sleep_timer)
+                .setItems(labels, new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        PlayerService.sleep(MainActivity.this, minutes[which]);
+                        Toast.makeText(MainActivity.this, minutes[which] == 0 ? "Temporizador apagado"
+                                : minutes[which] < 0 ? "Se pausa al terminar la canción"
+                                : "Se pausa en " + minutes[which] + " min", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    /** Aviso corto mientras se espera una respuesta. */
+    private final class ProgressToast {
+        private final Toast t;
+
+        ProgressToast(String text) {
+            t = Toast.makeText(MainActivity.this, text, Toast.LENGTH_SHORT);
+            t.show();
+        }
+
+        void cancel() {
+            t.cancel();
+        }
+    }
+
+    // ------------------------------------------------------------------ avatar
+
+    private boolean avatarLoaded;
+
+    /** Tu foto de Spotify en el encabezado (un pedido por sesión; la URL queda guardada). */
+    private void loadAvatar() {
+        if (avatarLoaded) {
+            return;
+        }
+        avatarLoaded = true;
+        String cached = prefs.avatarUrl();
+        if (cached.length() > 0 && !prefs.eco()) {
+            CoverLoader.into(avatar, cached);
+        }
+        WebApi.get(this).me(new WebApi.Profile() {
+            @Override
+            public void onProfile(String name, String imageUrl) {
+                if (imageUrl != null && imageUrl.length() > 0) {
+                    prefs.setAvatarUrl(imageUrl);
+                    if (!prefs.eco()) {
+                        CoverLoader.into(avatar, imageUrl);
+                    }
+                }
+            }
+        });
+    }
+
     /** Tiñe el mini reproductor con el tono de la carátula (como Spotify). 0 = color neutro. */
     private void tintMini(int color) {
         if (color == miniColor && color != 0) {
@@ -551,15 +944,21 @@ public final class MainActivity extends Activity implements EngineState.Observer
 
     private void showNowPlaying(boolean show) {
         nowPlaying.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) {
+            lyricsView.setVisibility(View.GONE);
+        }
         if (show) {
             hideKeyboard();
             render(EngineState.get()); // carga la carátula grande recién ahora
+            loadLyrics(EngineState.get()); // la letra solo se pide con "Sonando" a la vista
         }
     }
 
     @Override
     public void onBackPressed() {
-        if (nowPlaying.getVisibility() == View.VISIBLE) {
+        if (lyricsView.getVisibility() == View.VISIBLE) {
+            showLyrics(false);
+        } else if (nowPlaying.getVisibility() == View.VISIBLE) {
             showNowPlaying(false);
         } else if (!browser.back()) {
             super.onBackPressed();
@@ -624,6 +1023,9 @@ public final class MainActivity extends Activity implements EngineState.Observer
         if (s.loggedIn && browser.isEmpty()) {
             showTab(TAB_HOME); // pantalla inicial al conectar
         }
+        if (s.loggedIn) {
+            loadAvatar();
+        }
         if (!s.uri.equals(shownUri)) {
             shownUri = s.uri;
             browser.refreshHighlight();
@@ -647,8 +1049,10 @@ public final class MainActivity extends Activity implements EngineState.Observer
         pairButton.setText(s.pairing ? R.string.pair_cancel : R.string.pair);
 
         String st;
-        if (s.loggedIn) {
-            st = "● " + (s.active ? "sonando aquí" : "conectado") + " · " + prefs.bitrate() + "k";
+        if (s.loggedIn && s.remoteDevice.length() > 0) {
+            st = "● " + s.remoteDevice;
+        } else if (s.loggedIn) {
+            st = "● " + prefs.bitrate() + " kbps";
         } else if (s.running) {
             st = "○ conectando…";
         } else {
@@ -656,6 +1060,25 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         status.setText(st);
         status.setTextColor(getResources().getColor(s.loggedIn ? R.color.accent : R.color.muted));
+        TextView npStatus = (TextView) findViewById(R.id.status_np);
+        if (s.sleepAt > 0) {
+            long min = Math.max(1, (s.sleepAt - android.os.SystemClock.elapsedRealtime() + 59_999) / 60_000);
+            npStatus.setText("SE PAUSA EN " + min + " MIN");
+        } else if (s.sleepEndOfTrack) {
+            npStatus.setText("SE PAUSA AL TERMINAR");
+        } else if (s.remoteDevice.length() > 0) {
+            npStatus.setText("EN " + s.remoteDevice.toUpperCase());
+        } else {
+            npStatus.setText(R.string.now_playing);
+        }
+        ((ImageButton) findViewById(R.id.np_timer)).setColorFilter(getResources().getColor(
+                s.sleepAt > 0 || s.sleepEndOfTrack ? R.color.accent : R.color.text));
+        int devColor = getResources().getColor(s.remoteDevice.length() > 0 ? R.color.accent : R.color.text);
+        ((ImageButton) findViewById(R.id.np_devices)).setColorFilter(devColor);
+        ((ImageButton) findViewById(R.id.mini_device)).setColorFilter(devColor);
+        if (nowPlaying.getVisibility() == View.VISIBLE && !s.uri.equals(lyricsUri)) {
+            loadLyrics(s);
+        }
 
         title.setText(s.title.length() > 0 ? s.title : "—");
         String sub = s.artist;
@@ -673,7 +1096,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
             showNowPlaying(false);
         }
         miniTitle.setText(s.title);
-        miniArtist.setText(s.artist);
+        miniArtist.setText(s.remoteDevice.length() > 0 ? "Sonando en " + s.remoteDevice : s.artist);
+        miniArtist.setTextColor(getResources().getColor(s.remoteDevice.length() > 0 ? R.color.accent : R.color.muted));
         play.setContentDescription(getString(s.isPlaying() ? R.string.pause : R.string.play));
         tint(shuffle, s.shuffle);
         tint(repeat, !"off".equals(s.repeat));
@@ -731,6 +1155,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         if (nowPlaying.getVisibility() == View.VISIBLE) { // no dibujar lo que no se ve
             time.setText(fmt(pos));
             seek.setProgress(progress);
+            updateLyric(pos);
         }
     }
 

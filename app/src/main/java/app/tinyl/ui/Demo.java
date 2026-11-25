@@ -86,14 +86,34 @@ final class Demo {
             home.add(it("spotify:playlist:c", "milanesas y compu y marvelboy", "", "playlist"));
             home.add(it("spotify:artist:e", "El Madrileño", "", "artist"));
             home.add(it("spotify:album:d", "LIVE FOREVER", "", "album"));
-            home.add(it("spotify:playlist:f", "TRAP DE VERDAD", "", "playlist"));
-            home.add(it("spotify:playlist:g", "Mecánico", "", "playlist"));
+            home.add(WebApi.Item.header("Tus artistas del momento"));
+            for (String[] ar : new String[][]{{"YSY A", "Artista"}, {"Tame Impala", "Artista"},
+                    {"Lil Peep", "Artista"}, {"cero", "Artista"}}) {
+                WebApi.Item x = it("spotify:artist:" + ar[0], ar[0], ar[1], "artist");
+                x.card = true;
+                home.add(x);
+            }
             home.add(WebApi.Item.header("Escuchado recientemente"));
             home.addAll(tracks);
             browser.showStatic(Browser.greeting(), null, home, true, true);
         }
-        if ("playing".equals(mode)) {
+        if ("playing".equals(mode) || "lyrics".equals(mode)) {
+            app.tinyl.lyrics.Lyrics l = new app.tinyl.lyrics.Lyrics();
+            l.synced = true;
+            String[] words = {"Salgo a la ruta con el tanque lleno", "Las luces de la ciudad quedan atrás",
+                    "Suena tu canción en el estéreo", "A toda hora, a toda hora",
+                    "No hay nada que me pueda frenar", "Y el viento me dice que siga",
+                    "A toda hora, a toda hora", "Hasta que salga el sol"};
+            for (int i = 0; i < words.length; i++) {
+                l.lines.add(new app.tinyl.lyrics.Lyrics.Line(60000 + i * 9000L, words[i]));
+            }
+            a.demoLyrics(l);
+        }
+        if ("playing".equals(mode) || "lyrics".equals(mode)) {
             a.findViewById(app.tinyl.R.id.mini).performClick();
+        }
+        if ("lyrics".equals(mode)) {
+            a.findViewById(app.tinyl.R.id.lyrics_card).performClick();
         }
     }
 }

@@ -501,9 +501,12 @@ fn handle_command(text: &str) {
                                 .and_then(Value::as_u64)
                                 .map(|i| PlayingTrack::Index(i as u32))
                         });
+                    // "position_ms": arrancar en ese punto (retomar un episodio de podcast).
+                    let seek_to = cmd.get("position_ms").and_then(Value::as_u64).unwrap_or(0) as u32;
                     let opts = LoadRequestOptions {
                         start_playing: true,
                         playing_track,
+                        seek_to,
                         ..Default::default()
                     };
                     let req = if uri.starts_with("spotify:track:") || uri.starts_with("spotify:episode:") {
@@ -813,4 +816,45 @@ pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativePrefetchCancel(
     _class: JClass,
 ) {
     prefetch::cancel();
+}
+
+/// Letras de Spotify (`color-lyrics`), como las pide su propio cliente: nombrando la carátula del
+/// álbum (sin ella responde 404). Devuelve el JSON crudo; Java lo interpreta y cae a LRCLIB.
+#[no_mangle]
+pub extern "system" fn Java_app_tinyl_engine_NativeEngine_nativeLyrics(
+    mut env: JNIEnv,
+    _class: JClass,
+    track_uri: JString,
+    cover_id: JString,
+    req_id: jint,
+) {
+    let uri = jstr(&mut env, &track_uri);
+    let cover = jstr(&mut env, &cover_id);
+    let session = engine().session.clone();
+    let Some(session) = session else {
+        return emit(json!({"type": "lyrics", "req_id": req_id, "status": "error", "message": "sin sesión"}));
+    };
+    runtime().spawn(async move {
+        let id = uri.strip_prefix("spotify:track:").unwrap_or("");
+        if id.len() != 22 || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return emit(json!({"type": "lyrics", "req_id": req_id, "status": "none"}));
+        }
+        let query = "format=json&vocalRemoval=false&market=from_token";
+        let endpoint = if cover.len() == 40 && cover.chars().all(|c| c.is_ascii_hexdigit()) {
+            format!("/color-lyrics/v2/track/{id}/image/spotify:image:{cover}?{query}")
+        } else {
+            format!("/color-lyrics/v2/track/{id}?{query}")
+        };
+        match session.spclient().request_as_json(&http::Method::GET, &endpoint, None, None).await {
+            Ok(bytes) => emit(json!({
+                "type": "lyrics", "req_id": req_id, "status": "found",
+                "json": String::from_utf8_lossy(&bytes),
+            })),
+            Err(e) if e.kind == librespot_core::error::ErrorKind::NotFound => {
+                emit(json!({"type": "lyrics", "req_id": req_id, "status": "none"}))
+            }
+            Err(e) => emit(json!({"type": "lyrics", "req_id": req_id, "status": "error",
+                                  "message": e.to_string()})),
+        }
+    });
 }

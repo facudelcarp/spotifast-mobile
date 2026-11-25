@@ -116,6 +116,14 @@ public final class Prefs {
         p.edit().putBoolean("prefetch_wifi_only", v).apply();
     }
 
+    public String avatarUrl() {
+        return p.getString("avatar_url", "");
+    }
+
+    public void setAvatarUrl(String v) {
+        p.edit().putString("avatar_url", v).apply();
+    }
+
     public int volume() {
         return p.getInt("volume", 70);
     }

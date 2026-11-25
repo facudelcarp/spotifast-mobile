@@ -71,6 +71,8 @@ public final class NativeEngine {
 
     private static native void nativePrefetchCancel();
 
+    private static native void nativeLyrics(String trackUri, String coverId, int reqId);
+
     private static native void nativeHttp(String method, String url, String headersJson,
                                           String body, int reqId);
 
@@ -111,6 +113,11 @@ public final class NativeEngine {
 
     public static void prefetchCancel() {
         nativePrefetchCancel();
+    }
+
+    /** Letras de Spotify; responde con un evento "lyrics" (ver {@link app.tinyl.lyrics.Lyrics}). */
+    public static void lyrics(String trackUri, String coverId, int reqId) {
+        nativeLyrics(trackUri, coverId == null ? "" : coverId, reqId);
     }
 
     /**

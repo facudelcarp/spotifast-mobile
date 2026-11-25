@@ -44,6 +44,7 @@ public final class PlayerService extends Service implements EngineState.Observer
     private static final String ACTION_PAIR = "app.tinyl.PAIR";
     private static final String ACTION_PAIR_CANCEL = "app.tinyl.PAIR_CANCEL";
     private static final String ACTION_PREFETCH = "app.tinyl.PREFETCH";
+    private static final String ACTION_SLEEP = "app.tinyl.SLEEP";
     private static final String ACTION_PREFETCH_CANCEL = "app.tinyl.PREFETCH_CANCEL";
     private static final int PREFETCH_NOTIF_ID = 2;
     private static final String CHANNEL = "playback";
@@ -127,6 +128,14 @@ public final class PlayerService extends Service implements EngineState.Observer
                 .putExtra("title", title).putExtra("uris", a.toString()));
     }
 
+    /**
+     * Temporizador para dormir. {@code minutes}: 0 = cancelar, -1 = al terminar la canción.
+     * Al cumplirse baja el volumen durante 8 s y pausa (sin cortes bruscos).
+     */
+    public static void sleep(Context c, int minutes) {
+        c.startService(new Intent(c, PlayerService.class).setAction(ACTION_SLEEP).putExtra("minutes", minutes));
+    }
+
     public static void pair(Context c, boolean start) {
         c.startService(new Intent(c, PlayerService.class).setAction(start ? ACTION_PAIR : ACTION_PAIR_CANCEL));
     }
@@ -191,6 +200,8 @@ public final class PlayerService extends Service implements EngineState.Observer
                     prefs.deviceName(), prefs.deviceId(), wifiIp(), prefs.bitrate(), prefs.volume(),
                     prefs.cacheMb());
             scheduleIdleStop();
+        } else if (ACTION_SLEEP.equals(action)) {
+            setSleep(intent.getIntExtra("minutes", 0));
         } else if (ACTION_PREFETCH.equals(action)) {
             startPrefetch(intent.getStringExtra("title"), intent.getStringExtra("uris"));
         } else if (ACTION_PREFETCH_CANCEL.equals(action)) {
@@ -203,6 +214,15 @@ public final class PlayerService extends Service implements EngineState.Observer
 
     @Override
     public void onStateChanged(EngineState s) {
+        // "Al terminar esta canción": cuando arranca la siguiente, pausar enseguida.
+        if (s.sleepEndOfTrack && sleepTrackUri != null && s.uri.length() > 0 && !s.uri.equals(sleepTrackUri)) {
+            s.sleepEndOfTrack = false;
+            sleepTrackUri = null;
+            NativeEngine.command("pause");
+        }
+        if (s.active && s.remoteDevice.length() > 0) {
+            s.remoteDevice = ""; // volvió a sonar acá
+        }
         if (!s.pairing && multicastLock.isHeld()) {
             multicastLock.release();
         }
@@ -219,6 +239,59 @@ public final class PlayerService extends Service implements EngineState.Observer
         if (!s.running && !s.loggedIn) {
             dropForeground(true);
         }
+    }
+
+    // ------------------------------------------------------------------ temporizador para dormir
+
+    private String sleepTrackUri;
+
+    private final Runnable sleepFire = new Runnable() {
+        @Override
+        public void run() {
+            fadeAndPause();
+        }
+    };
+
+    private void setSleep(int minutes) {
+        EngineState s = EngineState.get();
+        handler.removeCallbacks(sleepFire);
+        s.sleepAt = 0;
+        s.sleepEndOfTrack = false;
+        if (minutes > 0) {
+            s.sleepAt = android.os.SystemClock.elapsedRealtime() + minutes * 60_000L;
+            handler.postAtTime(sleepFire, s.sleepAt);
+        } else if (minutes < 0) {
+            s.sleepEndOfTrack = true;
+            sleepTrackUri = s.uri;
+        }
+        s.changed();
+    }
+
+    /** Baja el volumen en 8 s y pausa; después lo deja como estaba para la próxima vez. */
+    private void fadeAndPause() {
+        final EngineState s = EngineState.get();
+        s.sleepAt = 0;
+        s.sleepEndOfTrack = false;
+        s.changed();
+        handler.post(new Runnable() {
+            int step = 16;
+
+            @Override
+            public void run() {
+                if (step-- > 0) {
+                    audio.setFade(step / 16f);
+                    handler.postDelayed(this, 500);
+                } else {
+                    NativeEngine.command("pause");
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            audio.setFade(1f);
+                        }
+                    }, 1500);
+                }
+            }
+        });
     }
 
     // ------------------------------------------------------------------ precarga

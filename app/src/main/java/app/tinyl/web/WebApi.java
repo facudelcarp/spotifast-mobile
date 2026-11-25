@@ -32,9 +32,14 @@ public final class WebApi implements NativeEngine.Listener {
         /** Miniatura chica (~64 px, unos pocos KB) o null. */
         public String image;
         /** Para filas dobles (grilla de Inicio): las dos celdas. */
-        public Item left, right;
+        public Item left, right, third;
         /** Dueño (playlists): para ofrecer solo las propias en "Agregar a playlist". */
         public String ownerId;
+        /** Episodios: dónde quedaste, duración y si ya lo terminaste. */
+        public long resumeMs, durationMs;
+        public boolean fullyPlayed;
+        /** Mostrar como tarjeta grande (artistas del momento, podcasts) en vez de fila. */
+        public boolean card;
 
         Item(String uri, String title, String subtitle, String kind) {
             this.uri = uri;
@@ -121,13 +126,15 @@ public final class WebApi implements NativeEngine.Listener {
     // ================================================================ lecturas
 
     public void search(String query, Result r) {
-        read("/v1/search?type=track,album,playlist,artist&limit=8&q=" + enc(query), r, new Parser() {
+        read("/v1/search?type=track,album,playlist,artist,show,episode&limit=6&q=" + enc(query), r, new Parser() {
             @Override
             public String parse(JSONObject o, List<Item> out) {
                 section(o.optJSONObject("tracks"), "track", "Canciones", out);
                 section(o.optJSONObject("artists"), "artist", "Artistas", out);
                 section(o.optJSONObject("albums"), "album", "Álbumes", out);
                 section(o.optJSONObject("playlists"), "playlist", "Playlists", out);
+                section(o.optJSONObject("shows"), "show", "Podcasts", out);
+                section(o.optJSONObject("episodes"), "episode", "Episodios", out);
                 return null;
             }
         });
@@ -399,6 +406,117 @@ public final class WebApi implements NativeEngine.Listener {
         });
     }
 
+    // ================================================================ podcasts
+
+    public void savedShows(Result r) {
+        page("/v1/me/shows?limit=50", r);
+    }
+
+    public void savedEpisodes(Result r) {
+        page("/v1/me/episodes?limit=50", r);
+    }
+
+    public void showEpisodes(String showUri, Result r) {
+        page("/v1/shows/" + id(showUri) + "/episodes?limit=50", r);
+    }
+
+    // ================================================================ perfil e Inicio
+
+    public interface Profile {
+        void onProfile(String displayName, String imageUrl);
+    }
+
+    /** Nombre y foto de tu cuenta (para el avatar del Inicio). */
+    public void me(final Profile p) {
+        request("GET", "/v1/me", null, new Response() {
+            @Override
+            public void ok(byte[] body) {
+                try {
+                    JSONObject o = new JSONObject(new String(body, "UTF-8"));
+                    p.onProfile(o.optString("display_name"), smallest(o.optJSONArray("images")));
+                } catch (Exception ignored) {
+                }
+            }
+
+            @Override
+            public void fail(String message) {
+            }
+        });
+    }
+
+    /** Tus artistas más escuchados en las últimas semanas. */
+    public void topArtists(int limit, Result r) {
+        read("/v1/me/top/artists?time_range=short_term&limit=" + limit, r, PAGE);
+    }
+
+    // ================================================================ Spotify Connect
+
+    public static final class Device {
+        public final String id, name, type;
+        public final boolean active;
+
+        Device(JSONObject o) {
+            id = o.optString("id");
+            name = o.optString("name");
+            type = o.optString("type");
+            active = o.optBoolean("is_active");
+        }
+    }
+
+    public interface Devices {
+        void onDevices(List<Device> devices, String error);
+    }
+
+    public void devices(final Devices cb) {
+        request("GET", "/v1/me/player/devices", null, new Response() {
+            @Override
+            public void ok(byte[] body) {
+                List<Device> out = new ArrayList<>();
+                try {
+                    JSONArray a = new JSONObject(new String(body, "UTF-8")).optJSONArray("devices");
+                    for (int i = 0; a != null && i < a.length(); i++) {
+                        JSONObject o = a.optJSONObject(i);
+                        if (o != null && o.optString("id").length() > 0) {
+                            out.add(new Device(o));
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+                cb.onDevices(out, null);
+            }
+
+            @Override
+            public void fail(String message) {
+                cb.onDevices(new ArrayList<Device>(), message);
+            }
+        });
+    }
+
+    /** Pasar la reproducción a otro dispositivo (sigue sonando allá). */
+    public void transfer(String deviceId, Done d) {
+        JSONObject body = new JSONObject();
+        try {
+            body.put("device_ids", new JSONArray().put(deviceId));
+            body.put("play", true);
+        } catch (Exception ignored) {
+        }
+        writeJson("PUT", "/v1/me/player", body.toString(), d);
+    }
+
+    private void writeJson(String method, String path, String body, final Done d) {
+        request(method, path, body, new Response() {
+            @Override
+            public void ok(byte[] data) {
+                d.onDone(true, null);
+            }
+
+            @Override
+            public void fail(String message) {
+                d.onDone(false, message);
+            }
+        });
+    }
+
     /** Un solo objeto (playlist con fields, pista, etc.). */
     private static final Parser SINGLE = new Parser() {
         @Override
@@ -513,6 +631,12 @@ public final class WebApi implements NativeEngine.Listener {
                 if (inner == null) {
                     inner = it.optJSONObject("album"); // /me/albums
                 }
+                if (inner == null) {
+                    inner = it.optJSONObject("show"); // /me/shows
+                }
+                if (inner == null) {
+                    inner = it.optJSONObject("episode"); // /me/episodes
+                }
                 Item parsed = item(inner != null ? inner : it, null);
                 if (parsed != null) {
                     out.add(parsed);
@@ -583,8 +707,33 @@ public final class WebApi implements NativeEngine.Listener {
             }
             case "episode": {
                 JSONObject show = o.optJSONObject("show");
-                sub = "Episodio" + (show == null ? "" : " · " + show.optString("name"));
-                return new Item(o.optString("uri"), name, sub, kind);
+                it = new Item(o.optString("uri"), name, "", kind);
+                it.durationMs = o.optLong("duration_ms");
+                JSONObject rp = o.optJSONObject("resume_point");
+                if (rp != null) {
+                    it.fullyPlayed = rp.optBoolean("fully_played");
+                    it.resumeMs = rp.optLong("resume_position_ms");
+                }
+                String date = o.optString("release_date", "");
+                StringBuilder sb = new StringBuilder();
+                if (show != null) {
+                    sb.append(show.optString("name"));
+                } else if (date.length() >= 10) {
+                    sb.append(date.substring(8, 10)).append('/').append(date.substring(5, 7)).append('/').append(date.substring(0, 4));
+                }
+                long minutes = Math.max(1, it.durationMs / 60000);
+                if (it.fullyPlayed) {
+                    sb.append(" · Escuchado");
+                } else if (it.resumeMs > 0) {
+                    sb.append(" · Quedan ").append(Math.max(1, (it.durationMs - it.resumeMs) / 60000)).append(" min");
+                } else {
+                    sb.append(" · ").append(minutes).append(" min");
+                }
+                Item ep = new Item(it.uri, it.title, sb.toString(), kind);
+                ep.durationMs = it.durationMs;
+                ep.resumeMs = it.resumeMs;
+                ep.fullyPlayed = it.fullyPlayed;
+                return ep;
             }
             case "album":
                 sub = ("single".equals(o.optString("album_type")) ? "Sencillo" : "Álbum")

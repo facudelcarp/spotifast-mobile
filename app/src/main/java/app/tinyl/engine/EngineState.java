@@ -38,6 +38,16 @@ public final class EngineState implements NativeEngine.Listener {
     public String uri = "";
     /** Contexto (playlist/álbum/artista) que pidió reproducir la app; "" si no se sabe. */
     public String contextUri = "";
+    /** Dispositivo al que se pasó la música (Spotify Connect); "" = suena acá. */
+    public String remoteDevice = "";
+    /** Temporizador para dormir: momento (elapsedRealtime) en que se pausa, o 0. */
+    public long sleepAt;
+    /** Temporizador "al terminar esta canción". */
+    public boolean sleepEndOfTrack;
+
+    public void changed() {
+        notifyObservers();
+    }
     public String title = "";
     public String artist = "";
     public String album = "";

@@ -50,4 +50,11 @@
     <string name="prefetch_wifi_only">Precargar solo con Wi-Fi</string>
     <string name="cache_clear">Vaciar caché de audio</string>
     <string name="cache_use">En caché: %1$d MB (canciones escuchadas y precargadas)</string>
+    <string name="back">Atrás</string>
+    <string name="devices">Dispositivos</string>
+    <string name="sleep_timer">Temporizador para dormir</string>
+    <string name="lyrics">Letra</string>
+    <string name="chip_all">Todo</string>
+    <string name="chip_music">Música</string>
+    <string name="chip_podcasts">Podcasts</string>
 </resources>

@@ -10,85 +10,65 @@
 
     <!-- ===================================================== navegación -->
     <LinearLayout
+        android:id="@+id/main_column"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Barra superior -->
+        <!-- Encabezado: avatar (o atrás) + título de la pantalla + estado -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="64dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="16dp"
-            android:paddingEnd="4dp">
-
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_launcher" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/app_name"
-                android:textColor="@color/text"
-                android:textSize="21sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/status"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:fontFamily="monospace"
-                android:singleLine="true"
-                android:textColor="@color/muted"
-                android:textSize="11sp" />
-
-            <ImageButton
-                android:id="@+id/btn_settings"
-                style="@style/IconButton"
-                android:contentDescription="@string/settings"
-                android:src="@drawable/ic_more" />
-        </LinearLayout>
-
-        <!-- Título de la pantalla + atrás -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:minHeight="48dp"
-            android:orientation="horizontal"
-            android:paddingStart="8dp"
             android:paddingEnd="16dp">
 
             <TextView
                 android:id="@+id/page_back"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
+                android:layout_marginStart="-8dp"
                 android:background="?android:attr/selectableItemBackground"
+                android:contentDescription="@string/back"
                 android:gravity="center"
                 android:text="‹"
                 android:textColor="@color/text"
                 android:textSize="28sp"
                 android:visibility="gone" />
 
+            <!-- Tu foto de Spotify; abre Ajustes (como el avatar de la app oficial) -->
+            <ImageView
+                android:id="@+id/avatar"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/avatar_bg"
+                android:contentDescription="@string/settings"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_launcher" />
+
             <TextView
                 android:id="@+id/page_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="12dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:singleLine="true"
                 android:textColor="@color/text"
                 android:textSize="22sp"
                 android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:ellipsize="end"
+                android:maxWidth="120dp"
+                android:singleLine="true"
+                android:textColor="@color/muted"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <!-- Buscador (solo en la pestaña Buscar) -->
@@ -132,6 +112,33 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Filtros de Inicio -->
+        <LinearLayout
+            android:id="@+id/home_chips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/chip_all"
+                style="@style/Tab"
+                android:text="@string/chip_all" />
+
+            <TextView
+                android:id="@+id/chip_music"
+                style="@style/Tab"
+                android:text="@string/chip_music" />
+
+            <TextView
+                android:id="@+id/chip_podcasts"
+                style="@style/Tab"
+                android:text="@string/chip_podcasts" />
+        </LinearLayout>
+
         <!-- Filtros de Biblioteca -->
         <HorizontalScrollView
             android:id="@+id/chips"
@@ -162,11 +169,17 @@
                     android:id="@+id/chip_artists"
                     style="@style/Tab"
                     android:text="@string/chip_artists" />
+
+                <TextView
+                    android:id="@+id/chip_shows"
+                    style="@style/Tab"
+                    android:text="@string/chip_podcasts" />
             </LinearLayout>
         </HorizontalScrollView>
 
         <!-- Contenido -->
         <FrameLayout
+            android:id="@+id/content"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
@@ -188,7 +201,7 @@
                 android:gravity="center"
                 android:padding="24dp"
                 android:textColor="@color/muted"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
             <!-- Login (con scroll para pantallas chicas de Android 4.4) -->
             <ScrollView
@@ -239,7 +252,7 @@
                         android:text="@string/pair"
                         android:textAllCaps="false"
                         android:textColor="@color/accent"
-                        android:textSize="14sp" />
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/pair_info"
@@ -249,7 +262,7 @@
                         android:fontFamily="monospace"
                         android:gravity="center"
                         android:textColor="@color/lcd"
-                        android:textSize="12sp"
+                        android:textSize="11sp"
                         android:visibility="gone" />
 
                     <TextView
@@ -304,7 +317,7 @@
                         android:ellipsize="end"
                         android:singleLine="true"
                         android:textColor="@color/text"
-                        android:textSize="14sp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -316,6 +329,15 @@
                         android:textColor="#FFD5DCD8"
                         android:textSize="13sp" />
                 </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/mini_device"
+                    style="@style/IconButton"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:contentDescription="@string/devices"
+                    android:padding="11dp"
+                    android:src="@drawable/ic_devices" />
 
                 <ImageButton
                     android:id="@+id/mini_like"
@@ -450,6 +472,8 @@
 
                 <TextView
                     android:id="@+id/status_np"
+                    android:singleLine="true"
+                    android:ellipsize="end"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
@@ -457,7 +481,19 @@
                     android:gravity="center"
                     android:text="@string/now_playing"
                     android:textColor="@color/muted"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
+
+                <ImageButton
+                    android:id="@+id/np_timer"
+                    style="@style/IconButton"
+                    android:contentDescription="@string/sleep_timer"
+                    android:src="@drawable/ic_timer" />
+
+                <ImageButton
+                    android:id="@+id/np_devices"
+                    style="@style/IconButton"
+                    android:contentDescription="@string/devices"
+                    android:src="@drawable/ic_devices" />
 
                 <ImageButton
                     android:id="@+id/np_queue"
@@ -506,7 +542,7 @@
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
                     android:textColor="@color/accent_dim"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
 
                 <TextView
                     android:id="@+id/badge"
@@ -514,7 +550,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textColor="@color/accent_dim"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <!-- Título + Me gusta -->
@@ -549,7 +585,7 @@
                         android:ellipsize="end"
                         android:singleLine="true"
                         android:textColor="@color/muted"
-                        android:textSize="15sp" />
+                        android:textSize="16sp" />
                 </LinearLayout>
 
                 <ImageButton
@@ -667,6 +703,107 @@
                     android:splitTrack="false"
                     android:thumb="@drawable/seek_thumb" />
             </LinearLayout>
+
+            <!-- Letra: vista previa (línea actual + siguiente); tocar abre la letra completa -->
+            <LinearLayout
+                android:id="@+id/lyrics_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/lyrics"
+                    android:textColor="@color/text"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/lyric_now"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/text"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/lyric_next"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/muted"
+                    android:textSize="16sp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
+
+    <!-- ===================================================== Letra completa (capa) -->
+    <LinearLayout
+        android:id="@+id/lyrics_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/np_bg"
+        android:clickable="true"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="16dp">
+
+            <ImageButton
+                android:id="@+id/lyrics_close"
+                style="@style/IconButton"
+                android:contentDescription="@string/close"
+                android:src="@drawable/ic_chevron_down" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/lyrics_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/text"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/lyrics_source"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:textColor="@color/muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/lyrics_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:divider="@null"
+            android:paddingStart="24dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="240dp"
+            android:scrollbars="none" />
+    </LinearLayout>
 </FrameLayout>

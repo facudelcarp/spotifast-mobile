@@ -20,6 +20,13 @@ Primera versión publicada, como **Tinyl · cliente liviano para Spotify** (ante
 - Cola, Me gusta, crear playlist y agregar canciones a una playlist.
 - Mini reproductor teñido con el color de la carátula y pantalla Sonando con display LCD.
 
+**Letras, Connect, temporizador y podcasts**
+- Letras sincronizadas de Spotify con respaldo de LRCLIB; letra completa que sigue la canción.
+- Elegir dispositivo Spotify Connect y traer la música de vuelta.
+- Temporizador para dormir con fundido.
+- Podcasts: biblioteca, episodios con progreso, "Seguir escuchando" y retomar donde quedaste.
+- Inicio rediseñado: avatar, filtros, artistas del momento, grilla de 8 puntos y 4 tamaños de letra.
+
 **Compatibilidad y consumo**
 - Android 4.4 en adelante; ARM y x86, 32 y 64 bits.
 - ~34 MB de RAM en uso; APK de ~3 MB por procesador.

@@ -45,6 +45,8 @@ final class Browser {
         boolean grid;
         /** Filas fijas al principio (no cuentan como "ya cargado"). */
         int fixed;
+        /** Qué decir si la pantalla queda vacía (nunca una pantalla en blanco). */
+        String emptyText = "Nada por acá";
 
         Page(String title, String contextUri, Loader loader) {
             this.title = title;
@@ -63,6 +65,7 @@ final class Browser {
     private static final String CLEAR_HISTORY = "clear_history";
     private static final String PAIR = "pair";
     private static final String PREFETCH = "prefetch";
+    private static final String CARDS = "cards";
 
     private final Activity activity;
     private final ListView list;
@@ -105,16 +108,109 @@ final class Browser {
 
     // ================================================================ pantallas raíz
 
-    /** Inicio: saludo + atajos a lo último que escuchaste + canciones recientes. */
-    void showHome() {
+    /**
+     * Inicio por filtro (Todo / Música / Podcasts): atajos a lo último que escuchaste, tus artistas
+     * del momento en tarjetas, canciones recientes; en Podcasts, "Seguir escuchando" y tus shows.
+     * Son 2 pedidos chicos por apertura; nada en segundo plano.
+     */
+    void showHome(final String filter) {
+        final String user = EngineState.get().username;
         Page p = new Page(greeting(), null, new Loader() {
             @Override
-            public void load(WebApi api, WebApi.Result r) {
-                api.home(EngineState.get().username, r);
+            public void load(final WebApi api, final WebApi.Result r) {
+                if ("podcasts".equals(filter)) {
+                    podcastsHome(api, r);
+                    return;
+                }
+                api.home(user, new WebApi.Result() {
+                    @Override
+                    public void onItems(List<WebApi.Item> items, String next) {
+                        int h = 0;
+                        while (h < items.size() && !items.get(h).isHeader()) {
+                            h++;
+                        }
+                        final List<WebApi.Item> shortcuts = new ArrayList<>();
+                        for (WebApi.Item it : items.subList(0, h)) {
+                            if (!"music".equals(filter) || !"show".equals(it.kind)) {
+                                shortcuts.add(it);
+                            }
+                        }
+                        final List<WebApi.Item> rest = new ArrayList<>(items.subList(h, items.size()));
+                        api.topArtists(6, new WebApi.Result() {
+                            @Override
+                            public void onItems(List<WebApi.Item> artists, String n) {
+                                List<WebApi.Item> out = new ArrayList<>(shortcuts);
+                                if (!artists.isEmpty()) {
+                                    out.add(WebApi.Item.header("Tus artistas del momento"));
+                                    for (WebApi.Item a : artists) {
+                                        a.card = true;
+                                    }
+                                    out.addAll(artists);
+                                }
+                                out.addAll(rest);
+                                r.onItems(out, null);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                List<WebApi.Item> out = new ArrayList<>(shortcuts);
+                                out.addAll(rest);
+                                r.onItems(out, null);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        r.onError(message);
+                    }
+                });
             }
         });
         p.grid = true;
+        p.emptyText = "Escuchá algo y tus favoritos van a aparecer acá";
         root(p);
+    }
+
+    /** Podcasts en el Inicio: episodios a medio escuchar + tus podcasts en tarjetas. */
+    private void podcastsHome(final WebApi api, final WebApi.Result r) {
+        api.savedEpisodes(new WebApi.Result() {
+            @Override
+            public void onItems(List<WebApi.Item> episodes, String next) {
+                final List<WebApi.Item> out = new ArrayList<>();
+                for (WebApi.Item e : episodes) {
+                    if (e.resumeMs > 0 && !e.fullyPlayed && out.size() < 6) {
+                        out.add(e);
+                    }
+                }
+                if (!out.isEmpty()) {
+                    out.add(0, WebApi.Item.header("Seguir escuchando"));
+                }
+                api.savedShows(new WebApi.Result() {
+                    @Override
+                    public void onItems(List<WebApi.Item> shows, String n) {
+                        if (!shows.isEmpty()) {
+                            out.add(WebApi.Item.header("Tus podcasts"));
+                            for (WebApi.Item s : shows) {
+                                s.card = true;
+                            }
+                            out.addAll(shows);
+                        }
+                        r.onItems(out, null);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        r.onItems(out, null);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(String message) {
+                r.onError(message);
+            }
+        });
     }
 
     static String greeting() {
@@ -166,6 +262,16 @@ final class Browser {
                     api.followedArtists(r);
                 }
             });
+        } else if ("shows".equals(filter)) {
+            p = new Page("Tu biblioteca", null, new Loader() {
+                @Override
+                public void load(WebApi api, WebApi.Result r) {
+                    api.savedShows(r);
+                }
+            });
+            p.items.add(nav("Tus episodios", "episodes", "Episodios guardados"));
+            p.fixed = 1;
+            p.emptyText = "Seguí podcasts en Spotify y aparecen acá";
         } else {
             p = new Page("Tu biblioteca", null, new Loader() {
                 @Override
@@ -302,7 +408,12 @@ final class Browser {
                 }));
                 break;
             case "show":
-                play(uri, null); // podcasts: por ahora se reproducen desde el principio
+                push(new Page(it.title, null, new Loader() {
+                    @Override
+                    public void load(WebApi api, WebApi.Result r) {
+                        api.showEpisodes(uri, r);
+                    }
+                }));
                 break;
             default:
         }
@@ -310,6 +421,14 @@ final class Browser {
 
     private void openLibrarySection(String key) {
         switch (key) {
+            case "episodes":
+                push(new Page("Tus episodios", null, new Loader() {
+                    @Override
+                    public void load(WebApi api, WebApi.Result r) {
+                        api.savedEpisodes(r);
+                    }
+                }));
+                break;
             case "liked": {
                 String user = EngineState.get().username;
                 String ctx = user.length() > 0 ? "spotify:user:" + user + ":collection" : null;
@@ -396,6 +515,13 @@ final class Browser {
             case "header":
                 return;
             default:
+        }
+        if ("episode".equals(it.kind)) {
+            // Podcasts: retomar donde quedaste (salvo que ya lo hayas terminado).
+            long pos = it.fullyPlayed ? 0 : Math.max(0, it.resumeMs - 3000);
+            EngineState.get().contextUri = it.uri;
+            NativeEngine.command("play", "uri", it.uri, "position_ms", pos);
+            return;
         }
         if (it.isPlayable()) {
             // Dentro de un álbum/playlist: arranca en esta pista y sigue con el resto.
@@ -648,6 +774,9 @@ final class Browser {
         Page p = top();
         title.setText(p.title);
         back.setVisibility(stack.size() > 1 ? View.VISIBLE : View.GONE);
+        if (avatar != null) {
+            avatar.setVisibility(stack.size() > 1 ? View.GONE : View.VISIBLE);
+        }
         List<WebApi.Item> rows = new ArrayList<>();
         boolean hasPlayable = false;
         for (WebApi.Item it : p.items) {
@@ -671,9 +800,9 @@ final class Browser {
                 rows.add(pair);
                 i += pair.right == null ? 1 : 2;
             }
-            rows.addAll(p.items.subList(i, p.items.size()));
+            addWithCards(rows, p.items.subList(i, p.items.size()));
         } else {
-            rows.addAll(p.items);
+            addWithCards(rows, p.items);
         }
         if (p.next != null && !p.loading) {
             rows.add(WebApi.Item.make("", "Cargar más…", "", MORE));
@@ -684,10 +813,37 @@ final class Browser {
         } else if (p.error != null) {
             empty.setText("Error: " + p.error);
         } else if (p.items.size() <= p.fixed && p.loader != null && !p.loading) {
-            empty.setText("Nada por acá");
+            empty.setText(p.emptyText);
         } else {
             empty.setText("");
         }
+    }
+
+    /** Las tarjetas (item.card) van de a tres por fila; el resto, una por fila. */
+    private static void addWithCards(List<WebApi.Item> rows, List<WebApi.Item> items) {
+        for (int i = 0; i < items.size(); i++) {
+            WebApi.Item it = items.get(i);
+            if (!it.card) {
+                rows.add(it);
+                continue;
+            }
+            WebApi.Item pair = WebApi.Item.make("", "", "", CARDS);
+            pair.left = it;
+            if (i + 1 < items.size() && items.get(i + 1).card) {
+                pair.right = items.get(++i);
+                if (i + 1 < items.size() && items.get(i + 1).card) {
+                    pair.third = items.get(++i);
+                }
+            }
+            rows.add(pair);
+        }
+    }
+
+    private View avatar;
+
+    /** El avatar del encabezado se oculta cuando aparece "atrás". */
+    void setAvatar(View v) {
+        avatar = v;
     }
 
     private final class Adapter extends BaseAdapter {
@@ -716,19 +872,19 @@ final class Browser {
 
         @Override
         public int getViewTypeCount() {
-            return 3;
+            return 4;
         }
 
         @Override
         public int getItemViewType(int i) {
             WebApi.Item it = rows.get(i);
-            return it.isHeader() ? 1 : PAIR.equals(it.kind) ? 2 : 0;
+            return it.isHeader() ? 1 : PAIR.equals(it.kind) ? 2 : CARDS.equals(it.kind) ? 3 : 0;
         }
 
         @Override
         public boolean isEnabled(int i) {
             WebApi.Item it = rows.get(i);
-            return !it.isHeader() && !PAIR.equals(it.kind); // las celdas manejan su propio toque
+            return !it.isHeader() && !PAIR.equals(it.kind) && !CARDS.equals(it.kind); // las celdas manejan su toque
         }
 
         @Override
@@ -739,6 +895,15 @@ final class Browser {
                     v = activity.getLayoutInflater().inflate(R.layout.item_header, parent, false);
                 }
                 ((TextView) v).setText(it.title);
+                return v;
+            }
+            if (CARDS.equals(it.kind)) {
+                if (v == null) {
+                    v = activity.getLayoutInflater().inflate(R.layout.item_card_pair, parent, false);
+                }
+                bindCard(v.findViewById(R.id.card_a), it.left);
+                bindCard(v.findViewById(R.id.card_b), it.right);
+                bindCard(v.findViewById(R.id.card_c), it.third);
                 return v;
             }
             if (PAIR.equals(it.kind)) {
@@ -767,8 +932,44 @@ final class Browser {
                     : android.graphics.Typeface.NORMAL);
             t2.setText(it.subtitle);
             t2.setVisibility(it.subtitle.length() == 0 ? View.GONE : View.VISIBLE);
+            Round.clip(icon, "artist".equals(it.kind) ? -1 : dp(4));
             bindIcon(icon, it);
             return v;
+        }
+
+        /** Tarjeta grande: imagen cuadrada (redonda si es artista), nombre y tipo. */
+        private void bindCard(View card, final WebApi.Item it) {
+            if (it == null) {
+                card.setVisibility(View.INVISIBLE);
+                return;
+            }
+            card.setVisibility(View.VISIBLE);
+            android.widget.ImageView img = (android.widget.ImageView) card.findViewById(android.R.id.icon);
+            int side = (activity.getResources().getDisplayMetrics().widthPixels - dp(48)) / 3;
+            if (img.getLayoutParams().height != side) {
+                img.getLayoutParams().height = side;
+                img.requestLayout();
+            }
+            Round.clip(img, "artist".equals(it.kind) ? -1 : dp(8));
+            ((TextView) card.findViewById(android.R.id.text1)).setText(it.title);
+            ((TextView) card.findViewById(android.R.id.text2)).setText(it.subtitle);
+            bindIcon(img, it);
+            if (img.getPaddingLeft() > 0) { // ícono provisorio sin imagen: más chico dentro de la tarjeta
+                int p = side / 3;
+                img.setPadding(p, p, p, p);
+            }
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Browser.this.onClick(it);
+                }
+            });
+            card.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    return Browser.this.onLongClick(it);
+                }
+            });
         }
 
         private void bindCell(View cell, final WebApi.Item it) {
@@ -777,6 +978,7 @@ final class Browser {
                 return;
             }
             cell.setVisibility(View.VISIBLE);
+            Round.clip(cell, dp(8));
             TextView t = (TextView) cell.findViewById(android.R.id.text1);
             t.setText(it.title);
             boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().contextUri);
@@ -877,7 +1079,9 @@ final class Browser {
                 int p2 = dp(13);
                 icon.setPadding(p2, p2, p2, p2);
                 icon.setImageResource("artist".equals(it.kind) ? R.drawable.ic_artist
-                        : "album".equals(it.kind) ? R.drawable.ic_album : R.drawable.ic_note);
+                        : "album".equals(it.kind) ? R.drawable.ic_album
+                        : "show".equals(it.kind) || "episode".equals(it.kind) ? R.drawable.ic_podcast
+                        : R.drawable.ic_note);
                 icon.setColorFilter(activity.getResources().getColor(R.color.panel_edge));
                 return;
             }
