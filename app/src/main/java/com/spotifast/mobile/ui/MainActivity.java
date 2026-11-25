@@ -48,6 +48,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
     private Browser browser;
     private ImageButton like;
     private TextView tabLibrary, tabSearch, tabQueue;
+    private View mini, nowPlaying;
+    private ImageView miniCover;
+    private TextView miniTitle, miniArtist;
+    private ImageButton miniPlay;
+    private android.widget.ProgressBar miniProgress;
+    private String shownMiniCover;
     /** Estado de Me gusta de la pista actual (null = desconocido). */
     private Boolean liked;
     private String likedUri;
@@ -120,6 +126,45 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 }
             }
         });
+        mini = findViewById(R.id.mini);
+        nowPlaying = findViewById(R.id.now_playing);
+        miniCover = (ImageView) findViewById(R.id.mini_cover);
+        miniTitle = (TextView) findViewById(R.id.mini_title);
+        miniArtist = (TextView) findViewById(R.id.mini_artist);
+        miniPlay = (ImageButton) findViewById(R.id.mini_play);
+        miniProgress = (android.widget.ProgressBar) findViewById(R.id.mini_progress);
+        click(R.id.mini, new Runnable() {
+            @Override
+            public void run() {
+                showNowPlaying(true);
+            }
+        });
+        click(R.id.np_close, new Runnable() {
+            @Override
+            public void run() {
+                showNowPlaying(false);
+            }
+        });
+        click(R.id.mini_play, new Runnable() {
+            @Override
+            public void run() {
+                NativeEngine.command(EngineState.get().isPlaying() ? "pause" : "play");
+            }
+        });
+        // Carátula cuadrada que deja entrar todos los controles sin scroll: en 480x800
+        // (típico de Android 4.4) queda más chica, en pantallas grandes ocupa el ancho.
+        cover.post(new Runnable() {
+            @Override
+            public void run() {
+                float d = getResources().getDisplayMetrics().density;
+                int controls = (int) (400 * d); // encabezado + LCD + título + barra + botones + volumen
+                int free = nowPlaying.getHeight() > 0 ? nowPlaying.getHeight()
+                        : getResources().getDisplayMetrics().heightPixels;
+                int size = Math.max((int) (120 * d), Math.min(cover.getWidth(), free - controls));
+                ViewGroupCompat.square(cover, size);
+            }
+        });
+        selectTab(tabLibrary);
         click(R.id.btn_like, new Runnable() {
             @Override
             public void run() {
@@ -130,12 +175,14 @@ public final class MainActivity extends Activity implements EngineState.Observer
         click(R.id.title, new Runnable() {
             @Override
             public void run() {
+                showNowPlaying(false);
                 browser.openNowPlaying(false);
             }
         });
         click(R.id.subtitle, new Runnable() {
             @Override
             public void run() {
+                showNowPlaying(false);
                 browser.openNowPlaying(true);
             }
         });
@@ -164,12 +211,6 @@ public final class MainActivity extends Activity implements EngineState.Observer
             @Override
             public void run() {
                 submitQuery();
-            }
-        });
-        click(R.id.btn_library, new Runnable() {
-            @Override
-            public void run() {
-                showLibrary();
             }
         });
         click(R.id.btn_settings, new Runnable() {
@@ -242,6 +283,9 @@ public final class MainActivity extends Activity implements EngineState.Observer
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 1);
         }
         handleIntent(getIntent());
+        if (Demo.requested(this, getIntent())) {
+            Demo.fill(this, browser);
+        }
     }
 
     @Override
@@ -366,13 +410,37 @@ public final class MainActivity extends Activity implements EngineState.Observer
 
     private void selectTab(TextView tab) {
         for (TextView t : new TextView[]{tabLibrary, tabSearch, tabQueue}) {
-            t.setTextColor(getResources().getColor(t == tab ? R.color.accent : R.color.muted));
+            boolean on = t == tab;
+            t.setBackgroundResource(on ? R.drawable.tab_on : R.drawable.tab_off);
+            t.setTextColor(getResources().getColor(on ? R.color.bg : R.color.text));
+        }
+    }
+
+    /** Ayudante mínimo para centrar la carátula con un tamaño fijo. */
+    private static final class ViewGroupCompat {
+        static void square(View v, int size) {
+            android.widget.LinearLayout.LayoutParams lp =
+                    (android.widget.LinearLayout.LayoutParams) v.getLayoutParams();
+            lp.width = size;
+            lp.height = size;
+            lp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+            v.setLayoutParams(lp);
+        }
+    }
+
+    private void showNowPlaying(boolean show) {
+        nowPlaying.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            hideKeyboard();
+            render(EngineState.get()); // carga la carátula grande recién ahora
         }
     }
 
     @Override
     public void onBackPressed() {
-        if (!browser.back()) {
+        if (nowPlaying.getVisibility() == View.VISIBLE) {
+            showNowPlaying(false);
+        } else if (!browser.back()) {
             super.onBackPressed();
         }
     }
@@ -466,7 +534,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         status.setText(st);
         status.setTextColor(getResources().getColor(s.loggedIn ? R.color.accent : R.color.muted));
 
-        title.setText(s.title.length() > 0 ? s.title : (s.loggedIn ? "Buscá algo para escuchar" : "—"));
+        title.setText(s.title.length() > 0 ? s.title : "—");
         String sub = s.artist;
         if (s.album.length() > 0 && !s.album.equals(s.artist)) {
             sub = sub.length() > 0 ? sub + " · " + s.album : s.album;
@@ -476,17 +544,38 @@ public final class MainActivity extends Activity implements EngineState.Observer
         badge.setText("buffering".equals(s.status) ? "BUF" : s.isPlaying() ? "PLAY" : "paused".equals(s.status) ? "PAUSE" : "");
 
         play.setImageResource(s.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play);
+        miniPlay.setImageResource(s.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play);
+        mini.setVisibility(s.loggedIn && s.title.length() > 0 ? View.VISIBLE : View.GONE);
+        if (mini.getVisibility() == View.GONE && nowPlaying.getVisibility() == View.VISIBLE) {
+            showNowPlaying(false);
+        }
+        miniTitle.setText(s.title);
+        miniArtist.setText(s.artist);
         play.setContentDescription(getString(s.isPlaying() ? R.string.pause : R.string.play));
         tint(shuffle, s.shuffle);
         tint(repeat, !"off".equals(s.repeat));
         repeat.setImageResource("track".equals(s.repeat) ? R.drawable.ic_repeat_one : R.drawable.ic_repeat);
         volume.setProgress(s.volume);
 
+        // Imágenes: 64 px en el mini reproductor, 300 px solo en "Sonando". Modo ahorro: ninguna.
         boolean eco = prefs.eco();
         cover.setVisibility(eco ? View.GONE : View.VISIBLE);
-        if (!eco && s.coverDefault != null && !s.coverDefault.equals(shownCover)) {
+        if (!eco && s.coverDefault != null && !s.coverDefault.equals(shownCover)
+                && nowPlaying.getVisibility() == View.VISIBLE) {
             shownCover = s.coverDefault;
             CoverLoader.into(cover, s.coverDefault);
+        }
+        if (eco || s.coverSmall == null) {
+            shownMiniCover = null;
+            int p = (int) (12 * getResources().getDisplayMetrics().density);
+            miniCover.setPadding(p, p, p, p);
+            miniCover.setImageResource(R.drawable.ic_note);
+            miniCover.setColorFilter(getResources().getColor(R.color.panel_edge));
+        } else if (!s.coverSmall.equals(shownMiniCover)) {
+            shownMiniCover = s.coverSmall;
+            miniCover.setPadding(0, 0, 0, 0);
+            miniCover.clearColorFilter();
+            CoverLoader.into(miniCover, s.coverSmall);
         }
 
         updateClock(s);
@@ -501,8 +590,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
             return;
         }
         long pos = s.positionNow();
-        time.setText(fmt(pos));
-        seek.setProgress(s.durationMs > 0 ? (int) (pos * 1000 / s.durationMs) : 0);
+        int progress = s.durationMs > 0 ? (int) (pos * 1000 / s.durationMs) : 0;
+        miniProgress.setProgress(progress);
+        if (nowPlaying.getVisibility() == View.VISIBLE) { // no dibujar lo que no se ve
+            time.setText(fmt(pos));
+            seek.setProgress(progress);
+        }
     }
 
     private void tint(ImageButton b, boolean on) {

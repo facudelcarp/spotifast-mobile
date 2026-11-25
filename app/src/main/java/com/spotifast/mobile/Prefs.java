@@ -42,9 +42,9 @@ public final class Prefs {
         p.edit().putInt("bitrate", v).apply();
     }
 
-    /** Modo ahorro: sin carátulas ni animaciones. */
+    /** Modo ahorro: sin imágenes. Apagado por defecto: las miniaturas son de ~64 px (pocos KB). */
     public boolean eco() {
-        return p.getBoolean("eco", true);
+        return p.getBoolean("eco", false);
     }
 
     public void setEco(boolean v) {

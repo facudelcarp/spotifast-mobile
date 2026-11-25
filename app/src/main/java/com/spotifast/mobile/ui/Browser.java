@@ -61,6 +61,7 @@ final class Browser {
     private final TextView title;
     private final View back;
     private final WebApi api;
+    private final com.spotifast.mobile.Prefs prefs;
     private final ArrayList<Page> stack = new ArrayList<>();
     private final Adapter adapter = new Adapter();
 
@@ -71,6 +72,7 @@ final class Browser {
         this.title = title;
         this.back = back;
         this.api = WebApi.get(activity);
+        this.prefs = new com.spotifast.mobile.Prefs(activity);
         list.setAdapter(adapter);
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -105,11 +107,11 @@ final class Browser {
 
     void showLibrary() {
         Page p = new Page("Biblioteca", null, null);
-        p.items.add(nav("Tus me gusta", "liked"));
-        p.items.add(nav("Playlists", "playlists"));
-        p.items.add(nav("Álbumes", "albums"));
-        p.items.add(nav("Artistas", "artists"));
-        p.items.add(nav("Escuchado recientemente", "recent"));
+        p.items.add(nav("Tus me gusta", "liked", "Canciones guardadas"));
+        p.items.add(nav("Playlists", "playlists", "Tuyas y seguidas"));
+        p.items.add(nav("Álbumes", "albums", "Guardados"));
+        p.items.add(nav("Artistas", "artists", "Que seguís"));
+        p.items.add(nav("Escuchado recientemente", "recent", "Últimas 50"));
         root(p);
     }
 
@@ -120,6 +122,17 @@ final class Browser {
                 api.queue(r);
             }
         }));
+    }
+
+    /** Pantalla con filas ya armadas (modo demo para capturas). */
+    void showStatic(String title, String contextUri, List<WebApi.Item> items, boolean asRoot) {
+        Page p = new Page(title, contextUri, null);
+        p.items.addAll(items);
+        if (asRoot) {
+            root(p);
+        } else {
+            push(p);
+        }
     }
 
     boolean isEmpty() {
@@ -419,8 +432,8 @@ final class Browser {
         }
     }
 
-    private static WebApi.Item nav(String title, String key) {
-        return WebApi.Item.make(key, title, "", NAV);
+    private static WebApi.Item nav(String title, String key, String subtitle) {
+        return WebApi.Item.make(key, title, subtitle, NAV);
     }
 
     // ================================================================ render
@@ -435,8 +448,8 @@ final class Browser {
             hasPlayable |= it.isPlayable();
         }
         if (p.contextUri != null && hasPlayable) {
-            rows.add(WebApi.Item.make("", "▶  Reproducir", "", PLAY_ALL));
-            rows.add(WebApi.Item.make("", "⇄  Aleatorio", "", SHUFFLE_ALL));
+            rows.add(WebApi.Item.make("", "Reproducir", "", PLAY_ALL));
+            rows.add(WebApi.Item.make("", "Aleatorio", "", SHUFFLE_ALL));
         }
         rows.addAll(p.items);
         if (p.next != null && !p.loading) {
@@ -508,15 +521,89 @@ final class Browser {
             }
             TextView t1 = (TextView) v.findViewById(android.R.id.text1);
             TextView t2 = (TextView) v.findViewById(android.R.id.text2);
+            android.widget.ImageView icon = (android.widget.ImageView) v.findViewById(android.R.id.icon);
             t1.setText(it.title);
-            boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind)
-                    || MORE.equals(it.kind) || NAV.equals(it.kind);
+            boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind) || MORE.equals(it.kind);
             boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().uri);
             t1.setTextColor(activity.getResources().getColor(
                     special || current ? R.color.accent : R.color.text));
-            t2.setText(NAV.equals(it.kind) ? "›" : it.subtitle);
-            t2.setVisibility(it.subtitle.length() == 0 && !NAV.equals(it.kind) ? View.GONE : View.VISIBLE);
+            t1.setTypeface(null, special || NAV.equals(it.kind) ? android.graphics.Typeface.BOLD
+                    : android.graphics.Typeface.NORMAL);
+            t2.setText(it.subtitle);
+            t2.setVisibility(it.subtitle.length() == 0 ? View.GONE : View.VISIBLE);
+            bindIcon(icon, it);
             return v;
+        }
+
+        /** Miniatura de la API, o un ícono si es una fila de navegación/acción. */
+        private void bindIcon(android.widget.ImageView icon, WebApi.Item it) {
+            int pad = 0;
+            int res = 0;
+            int bg = R.drawable.thumb_bg;
+            int tint = R.color.muted;
+            switch (it.kind) {
+                case NAV:
+                    pad = dp(12);
+                    switch (it.uri) {
+                        case "liked":
+                            res = R.drawable.ic_heart;
+                            bg = R.drawable.liked_tile;
+                            tint = R.color.text;
+                            break;
+                        case "playlists":
+                            res = R.drawable.ic_library;
+                            break;
+                        case "albums":
+                            res = R.drawable.ic_album;
+                            break;
+                        case "artists":
+                            res = R.drawable.ic_artist;
+                            break;
+                        default:
+                            res = R.drawable.ic_history;
+                    }
+                    break;
+                case PLAY_ALL:
+                    pad = dp(13);
+                    res = R.drawable.ic_play;
+                    bg = R.drawable.play_button;
+                    tint = R.color.bg;
+                    break;
+                case SHUFFLE_ALL:
+                    pad = dp(13);
+                    res = R.drawable.ic_shuffle;
+                    tint = R.color.accent;
+                    break;
+                case MORE:
+                    icon.setVisibility(View.GONE);
+                    return;
+                default:
+            }
+            icon.setVisibility(View.VISIBLE);
+            icon.setBackgroundResource(bg);
+            icon.setPadding(pad, pad, pad, pad);
+            if (res != 0) {
+                icon.setTag(null);
+                icon.setImageResource(res);
+                icon.setColorFilter(activity.getResources().getColor(tint));
+                return;
+            }
+            icon.clearColorFilter();
+            if (prefs.eco() || it.image == null) {
+                // Sin imagen: nota musical tenue (artista/álbum/canción)
+                icon.setTag(null);
+                int p2 = dp(13);
+                icon.setPadding(p2, p2, p2, p2);
+                icon.setImageResource("artist".equals(it.kind) ? R.drawable.ic_artist
+                        : "album".equals(it.kind) ? R.drawable.ic_album : R.drawable.ic_note);
+                icon.setColorFilter(activity.getResources().getColor(R.color.panel_edge));
+                return;
+            }
+            CoverLoader.into(icon, it.image);
+        }
+
+        private int dp(int v) {
+            return (int) (v * activity.getResources().getDisplayMetrics().density + 0.5f);
         }
     }
 

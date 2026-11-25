@@ -29,6 +29,8 @@ public final class WebApi implements NativeEngine.Listener {
         /** Para "Ir al álbum" / "Ir al artista" (pueden ser null). */
         public String albumUri;
         public String artistUri;
+        /** Miniatura chica (~64 px, unos pocos KB) o null. */
+        public String image;
 
         Item(String uri, String title, String subtitle, String kind) {
             this.uri = uri;
@@ -335,6 +337,43 @@ public final class WebApi implements NativeEngine.Listener {
     };
 
     static Item item(JSONObject o, String fallbackKind) {
+        Item it = itemNoImage(o, fallbackKind);
+        if (it != null) {
+            JSONObject album = o.optJSONObject("album");
+            JSONObject show = o.optJSONObject("show");
+            it.image = smallest(o.optJSONArray("images"));
+            if (it.image == null && album != null) {
+                it.image = smallest(album.optJSONArray("images"));
+            }
+            if (it.image == null && show != null) {
+                it.image = smallest(show.optJSONArray("images"));
+            }
+        }
+        return it;
+    }
+
+    /** La imagen más chica que siga viéndose nítida en 48dp (Spotify da 64/300/640 px). */
+    private static String smallest(JSONArray images) {
+        String best = null;
+        int bestW = Integer.MAX_VALUE;
+        for (int i = 0; images != null && i < images.length(); i++) {
+            JSONObject im = images.optJSONObject(i);
+            if (im == null) {
+                continue;
+            }
+            int w = im.optInt("width", 0);
+            if (w == 0) {
+                w = 300; // playlists de usuarios a veces sin tamaño
+            }
+            if (w >= 60 && w < bestW) {
+                bestW = w;
+                best = im.optString("url", null);
+            }
+        }
+        return best;
+    }
+
+    private static Item itemNoImage(JSONObject o, String fallbackKind) {
         if (o == null || o.optString("uri").length() == 0) {
             return null;
         }

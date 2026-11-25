@@ -12,14 +12,14 @@ import com.spotifast.mobile.engine.NativeEngine;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Carga mínima de carátulas (solo si el modo ahorro está apagado). Caché en memoria de ~2 MB. */
+/** Carga mínima de carátulas (solo si el modo ahorro está apagado). Caché en memoria de ~4 MB. */
 public final class CoverLoader {
 
     public interface Cb {
         void onBitmap(Bitmap b);
     }
 
-    private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(2 * 1024 * 1024) {
+    private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(4 * 1024 * 1024) {
         @Override
         protected int sizeOf(String key, Bitmap value) {
             return value.getByteCount();
@@ -37,8 +37,13 @@ public final class CoverLoader {
 
     public static void into(final ImageView view, final String url) {
         view.setTag(url);
+        Bitmap hit = url == null ? null : CACHE.get(url);
+        if (hit != null) {
+            view.setImageBitmap(hit);
+            return;
+        }
+        view.setImageDrawable(null); // fila reciclada: no mostrar la imagen anterior
         if (url == null) {
-            view.setImageDrawable(null);
             return;
         }
         load(url, new Cb() {

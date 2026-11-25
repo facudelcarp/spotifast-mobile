@@ -16,7 +16,7 @@
     <string name="logout">Log out</string>
     <string name="device_name">Device name</string>
     <string name="quality">Audio quality</string>
-    <string name="eco">Saver mode (no artwork)</string>
+    <string name="eco">Saver mode (no images)</string>
     <string name="cache">Audio cache (MB, 0 = unlimited)</string>
     <string name="idle">Stop engine after N minutes paused</string>
     <string name="save">Save</string>
@@ -32,8 +32,10 @@
     <string name="web_api_not_connected">No personal app: using the shared one (Spotify throttles it)</string>
     <string name="web_api_waiting">Waiting for authorization in the browser…</string>
     <string name="web_api_bad_id">The Client ID is 32 characters (0-9, a-f)</string>
-    <string name="tab_library">LIBRARY</string>
-    <string name="tab_search">SEARCH</string>
-    <string name="tab_queue">QUEUE</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_search">Search</string>
+    <string name="tab_queue">Queue</string>
     <string name="like">Like</string>
+    <string name="close">Close</string>
+    <string name="now_playing">NOW PLAYING</string>
 </resources>
