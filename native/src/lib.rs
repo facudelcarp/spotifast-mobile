@@ -13,6 +13,7 @@
 
 mod compat;
 mod net;
+mod prefetch;
 mod sink;
 
 use std::path::PathBuf;
@@ -126,7 +127,7 @@ fn runtime() -> &'static tokio::runtime::Runtime {
 }
 
 /// Envía un evento JSON a `NativeEngine.onEvent(String)`.
-fn emit(v: Value) {
+pub(crate) fn emit(v: Value) {
     let Some(vm) = VM.get() else { return };
     let Ok(mut env) = vm.attach_current_thread_permanently() else { return };
     let text = v.to_string();
@@ -785,4 +786,31 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHttp(
     let headers = jstr(&mut env, &headers);
     let body = jstr(&mut env, &body);
     runtime().spawn(net::request(method, url, headers, body, req_id));
+}
+
+/// Precarga de pistas a la caché (ver prefetch.rs). `uris_json`: arreglo JSON de URIs de pistas.
+#[no_mangle]
+pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativePrefetch(
+    mut env: JNIEnv,
+    _class: JClass,
+    uris_json: JString,
+    bitrate: jint,
+    req_id: jint,
+) {
+    let text = jstr(&mut env, &uris_json);
+    let uris: Vec<String> = serde_json::from_str(&text).unwrap_or_default();
+    let session = engine().session.clone();
+    let Some(session) = session else {
+        return emit(json!({"type": "prefetch", "req_id": req_id, "state": "error",
+                           "message": "el motor no está conectado"}));
+    };
+    runtime().spawn(prefetch::run(session, uris, bitrate, req_id));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativePrefetchCancel(
+    _env: JNIEnv,
+    _class: JClass,
+) {
+    prefetch::cancel();
 }

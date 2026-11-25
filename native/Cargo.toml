@@ -16,6 +16,7 @@ librespot-core = { version = "0.8.0", default-features = false, features = ["rus
 librespot-playback = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 librespot-connect = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 librespot-discovery = { version = "0.8.0", default-features = false, features = ["with-libmdns", "rustls-tls-webpki-roots"] }
+librespot-audio = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 librespot-metadata = { version = "0.8.0", default-features = false, features = ["rustls-tls-webpki-roots"] }
 futures-util = { version = "0.3", default-features = false }
 libc = "0.2"

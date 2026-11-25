@@ -7,7 +7,9 @@ Primera versión publicada.
 **Reproducción**
 - Motor librespot nativo dentro del APK: sin PC, sin la app oficial y sin apps auxiliares.
 - Control con el mismo protocolo que la API de Spotify Soloist.
-- 96/160/320 kbps, caché de audio de 200 MB, controles en notificación, pantalla bloqueada y auriculares.
+- 96/160/320 kbps, caché de audio de 512 MB, controles en notificación, pantalla bloqueada y auriculares.
+- **Precargar** playlists, álbumes y Tus me gusta con Wi-Fi: después, con datos móviles, el audio sale
+  del teléfono y solo viaja la clave de cada canción (sigue necesitando conexión; no es modo offline).
 
 **Navegación (inspirada en la app oficial, liviana para gama baja)**
 - Barra inferior Inicio · Buscar · Tu biblioteca · Crear.

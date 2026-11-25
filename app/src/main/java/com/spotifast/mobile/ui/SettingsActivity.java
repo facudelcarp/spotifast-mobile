@@ -59,6 +59,26 @@ public final class SettingsActivity extends Activity {
         root.addView(eco);
 
         final EditText cache = field(root, R.string.cache, String.valueOf(prefs.cacheMb()), InputType.TYPE_CLASS_NUMBER);
+        final TextView cacheUse = new TextView(this);
+        cacheUse.setTextSize(12);
+        root.addView(cacheUse);
+        showCacheUse(cacheUse);
+        final CheckBox wifiOnly = new CheckBox(this);
+        wifiOnly.setText(R.string.prefetch_wifi_only);
+        wifiOnly.setChecked(prefs.prefetchWifiOnly());
+        root.addView(wifiOnly);
+        Button clear = new Button(this);
+        clear.setText(R.string.cache_clear);
+        clear.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Apagar el motor antes de borrar archivos que podría estar usando.
+                stopService(new Intent(SettingsActivity.this, PlayerService.class));
+                deleteTree(new File(getCacheDir(), "audio"));
+                showCacheUse(cacheUse);
+            }
+        });
+        root.addView(clear);
         final EditText idle = field(root, R.string.idle, String.valueOf(prefs.idleMinutes()), InputType.TYPE_CLASS_NUMBER);
 
         // ---- Web API con app propia (como Spotifast): cupo propio, sin 429 de la app compartida
@@ -121,7 +141,8 @@ public final class SettingsActivity extends Activity {
                         ? prefs.deviceName() : name.getText().toString().trim());
                 prefs.setBitrate(quality.getCheckedRadioButtonId());
                 prefs.setEco(eco.isChecked());
-                prefs.setCacheMb(parse(cache, 200));
+                prefs.setCacheMb(parse(cache, 512));
+                prefs.setPrefetchWifiOnly(wifiOnly.isChecked());
                 prefs.setIdleMinutes(Math.max(1, parse(idle, 10)));
                 // Nombre, calidad y caché se aplican al reiniciar el motor.
                 stopService(new Intent(SettingsActivity.this, PlayerService.class));
@@ -154,6 +175,36 @@ public final class SettingsActivity extends Activity {
         ScrollView sv = new ScrollView(this);
         sv.addView(root);
         setContentView(sv);
+    }
+
+    /** Cuánto ocupa la caché de audio (canciones escuchadas y precargadas). */
+    private void showCacheUse(TextView t) {
+        long bytes = size(new File(getCacheDir(), "audio"));
+        t.setText(getString(R.string.cache_use, bytes / (1024 * 1024)));
+    }
+
+    private static long size(File f) {
+        if (f.isFile()) {
+            return f.length();
+        }
+        long total = 0;
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File c : children) {
+                total += size(c);
+            }
+        }
+        return total;
+    }
+
+    private static void deleteTree(File f) {
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File c : children) {
+                deleteTree(c);
+            }
+        }
+        f.delete();
     }
 
     private EditText field(LinearLayout root, int labelRes, String value, int type) {

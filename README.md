@@ -41,6 +41,7 @@ Inspirada en la app oficial, pero pensada para gama baja (un solo ListView por p
 - **Buscar**: búsquedas recientes guardadas en el teléfono (cero red) y resultados por Canciones, Artistas, Álbumes y Playlists. También acepta enlaces de Spotify, pegados o compartidos.
 - **Tu biblioteca** con filtros Playlists / Álbumes / Artistas y "Tus me gusta" arriba.
 - **Playlist, álbum y artista** con Reproducir y Aleatorio. Al tocar una canción, el contexto arranca desde ahí.
+- **Precargar** una playlist, álbum o Tus me gusta con Wi-Fi: el audio queda en la caché (cifrado, como al escucharlo) y después casi no gasta datos. Sigue necesitando conexión para la clave de cada canción: no es modo sin conexión ni evita la protección de Spotify.
 - **Crear playlist** y **Agregar a una playlist** desde el menú de cualquier canción (mantener apretado).
 - **Mini reproductor** flotante teñido con el color de la carátula (calculado de la miniatura de 64 px), con ♥ y play.
 - **Sonando**: carátula, display LCD retro, controles, volumen y acceso a la **Cola**.
