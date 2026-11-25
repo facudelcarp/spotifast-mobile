@@ -1,0 +1,44 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.spotifast.mobile"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.spotifast.mobile"
+        // Android 5.0 Lollipop (2014): VectorDrawable y Material nativos, sin AndroidX.
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName "0.1.0"
+        // Solo español/inglés: menos recursos dentro del APK.
+        resourceConfigurations += ["es", "en"]
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            // Firma de debug para poder instalar el APK de CI directamente.
+            // Reemplazar por un keystore propio antes de publicar.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    // OkHttp 3.12.x: última rama compatible con Android viejo y sin Kotlin stdlib (APK chico).
+    implementation "com.squareup.okhttp3:okhttp:3.12.13"
+}
