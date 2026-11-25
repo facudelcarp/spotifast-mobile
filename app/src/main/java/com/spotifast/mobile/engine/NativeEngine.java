@@ -23,9 +23,12 @@ public final class NativeEngine {
         void onEngineEvent(String type, JSONObject event);
     }
 
-    /** Respuesta HTTP. {@code status} 0 = error de red (el cuerpo trae el mensaje). */
+    /**
+     * Respuesta HTTP. {@code status} 0 = error de red (el cuerpo trae el mensaje).
+     * {@code retryAfter}: segundos que pide Spotify esperar tras un 429 ("" si no vino).
+     */
     public interface HttpCallback {
-        void onResponse(int status, byte[] body);
+        void onResponse(int status, byte[] body, String retryAfter);
     }
 
     private static final String TAG = "spotifast";
@@ -157,7 +160,7 @@ public final class NativeEngine {
         });
     }
 
-    static void onHttp(int reqId, final int status, final byte[] body) {
+    static void onHttp(int reqId, final int status, final byte[] body, final String retryAfter) {
         final HttpCallback cb;
         synchronized (HTTP) {
             cb = HTTP.get(reqId);
@@ -169,7 +172,7 @@ public final class NativeEngine {
         MAIN.post(new Runnable() {
             @Override
             public void run() {
-                cb.onResponse(status, body);
+                cb.onResponse(status, body, retryAfter);
             }
         });
     }

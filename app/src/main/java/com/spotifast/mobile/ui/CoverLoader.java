@@ -60,7 +60,7 @@ public final class CoverLoader {
         // Descarga por el motor (TLS propio) y decodificación fuera del hilo principal.
         NativeEngine.http("GET", url, null, null, new NativeEngine.HttpCallback() {
             @Override
-            public void onResponse(int status, final byte[] body) {
+            public void onResponse(int status, final byte[] body, String retryAfter) {
                 if (status != 200 || body == null) {
                     return;
                 }

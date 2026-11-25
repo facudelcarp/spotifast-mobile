@@ -23,4 +23,13 @@
     <string name="pair">Use another device (Spotify Connect)</string>
     <string name="pair_cancel">Cancel</string>
     <string name="pair_info">On another phone, tablet or PC on the same Wi-Fi: open Spotify → Devices → pick «%1$s».\nOnly needed once.</string>
+    <string name="web_api">Search and library (your Spotify app)</string>
+    <string name="web_api_help">Like Spotifast: with your own Spotify app you are not cut off with \"too many requests\" (429).\n1. Open the developer dashboard and tap Create app (the account needs Premium).\n2. Redirect URI: %1$s\n3. Tick Web API and save.\n4. Paste the Client ID here and tap Authorize.</string>
+    <string name="web_api_dashboard">Open Spotify for Developers dashboard</string>
+    <string name="web_api_client_id">Client ID</string>
+    <string name="web_api_authorize">Authorize</string>
+    <string name="web_api_connected">✓ Your app is connected</string>
+    <string name="web_api_not_connected">No personal app: using the shared one (Spotify throttles it)</string>
+    <string name="web_api_waiting">Waiting for authorization in the browser…</string>
+    <string name="web_api_bad_id">The Client ID is 32 characters (0-9, a-f)</string>
 </resources>

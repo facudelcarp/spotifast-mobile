@@ -102,14 +102,30 @@ public final class WebApi implements NativeEngine.Listener {
         void parse(JSONObject o, List<Item> out) throws Exception;
     }
 
+    /** Fuente del token, como en Spotifast: la app propia tiene cupo propio de pedidos. */
+    private interface SourcedToken {
+        void onToken(String token, boolean personal, String error);
+    }
+
+    /** Mientras Spotify pide esperar (Retry-After) no se manda nada: reintentar empeora el límite. */
+    private long cooldownUntil;
+
+    /** Cuántas veces la app compartida recibió 429 (para sugerir la app propia). */
+    public int sharedRateLimits;
+
     private void get(final String path, final Result r, final Parser parser) {
-        withToken(new TokenCb() {
+        long wait = cooldownUntil - SystemClock.elapsedRealtime();
+        if (wait > 0) {
+            r.onError(rateLimitMessage(!OAuthTokens.has(app, OAuthTokens.PERSONAL), wait / 1000 + 1));
+            return;
+        }
+        withToken(new SourcedToken() {
             @Override
-            public void onToken(final String tok, String error) {
+            public void onToken(final String tok, final boolean personal, String error) {
                 if (tok == null) {
                     // Mensaje corto: el detalle técnico va al log, no a la pantalla.
                     android.util.Log.w("spotifast", "token Web API: " + error);
-                    r.onError("no hay permiso para buscar. Probá cerrar sesión y entrar de nuevo con el navegador.");
+                    r.onError("no hay permiso para buscar. Configurá tu app de Spotify en Ajustes.");
                     return;
                 }
                 JSONObject headers = new JSONObject();
@@ -121,10 +137,23 @@ public final class WebApi implements NativeEngine.Listener {
                 NativeEngine.http("GET", "https://api.spotify.com" + path, headers, null,
                         new NativeEngine.HttpCallback() {
                             @Override
-                            public void onResponse(int status, byte[] body) {
+                            public void onResponse(int status, byte[] body, String retryAfter) {
+                                if (status == 429) {
+                                    long secs = parseSeconds(retryAfter);
+                                    cooldownUntil = SystemClock.elapsedRealtime() + secs * 1000;
+                                    if (!personal) {
+                                        sharedRateLimits++;
+                                    }
+                                    r.onError(rateLimitMessage(!personal, secs));
+                                    return;
+                                }
                                 if (status == 401) {
-                                    token = null;
-                                    OAuthTokens.invalidate(app);
+                                    if (personal) {
+                                        OAuthTokens.invalidate(app, OAuthTokens.PERSONAL);
+                                    } else {
+                                        OAuthTokens.invalidate(app, OAuthTokens.SHARED);
+                                        token = null;
+                                    }
                                 }
                                 if (status < 200 || status >= 300) {
                                     android.util.Log.w("spotifast", "Web API " + status + ": " + new String(body));
@@ -144,22 +173,51 @@ public final class WebApi implements NativeEngine.Listener {
         });
     }
 
-    /** Primero el token OAuth del login (permisos explícitos); si no hay, el del motor (login5). */
-    private void withToken(final TokenCb cb) {
-        OAuthTokens.get(app, new OAuthTokens.Cb() {
+    private static long parseSeconds(String retryAfter) {
+        try {
+            return Math.max(1, Math.min(600, Long.parseLong(retryAfter.trim())));
+        } catch (Exception e) {
+            return 30; // sin Retry-After: pausa prudente
+        }
+    }
+
+    private static String rateLimitMessage(boolean shared, long secs) {
+        return shared
+                ? "Spotify limitó la app compartida (reintentá en " + secs + " s). Para que no pase, "
+                  + "configurá tu propia app de Spotify en Ajustes, como en Spotifast."
+                : "Spotify pidió esperar " + secs + " s antes de seguir.";
+    }
+
+    /** 1) app propia del usuario, 2) token del login de reproducción, 3) token login5 del motor. */
+    private void withToken(final SourcedToken cb) {
+        OAuthTokens.get(app, OAuthTokens.PERSONAL, new OAuthTokens.Cb() {
             @Override
-            public void onToken(String oauth) {
-                if (oauth != null) {
-                    cb.onToken(oauth, null);
+            public void onToken(String personal) {
+                if (personal != null) {
+                    cb.onToken(personal, true, null);
                     return;
                 }
-                if (token != null && SystemClock.elapsedRealtime() < tokenExpiry) {
-                    cb.onToken(token, null);
-                    return;
-                }
-                int id = nextReq++;
-                pending.put(id, cb);
-                NativeEngine.requestToken(SCOPES, id);
+                OAuthTokens.get(app, OAuthTokens.SHARED, new OAuthTokens.Cb() {
+                    @Override
+                    public void onToken(String shared) {
+                        if (shared != null) {
+                            cb.onToken(shared, false, null);
+                            return;
+                        }
+                        if (token != null && SystemClock.elapsedRealtime() < tokenExpiry) {
+                            cb.onToken(token, false, null);
+                            return;
+                        }
+                        int id = nextReq++;
+                        pending.put(id, new TokenCb() {
+                            @Override
+                            public void onToken(String t, String error) {
+                                cb.onToken(t, false, error);
+                            }
+                        });
+                        NativeEngine.requestToken(SCOPES, id);
+                    }
+                });
             }
         });
     }
