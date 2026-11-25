@@ -10,6 +10,11 @@
   terminar sigue con similares en vez de detenerse.
 - **Iniciar radio** desde el menú de cualquier canción (mantener apretado) o desde la Cola: esa
   canción y después similares, aunque la reproducción automática esté apagada.
+- **Sonando rediseñada**: fondo teñido con el color de la carátula, "Reproduciendo desde" con el
+  nombre de la playlist/álbum/radio, carátula más grande (el display LCD pasó a ser el tiempo verde
+  bajo la barra), deslizar la carátula para pasar de tema, fila con el dispositivo donde suena,
+  temporizador con minutos restantes, compartir enlace y menú ⋮ (radio, agregar a playlist, ir al
+  álbum/artista). Títulos largos en marquesina y logo de Tinyl si no hay carátula.
 - **Cola renovada**: interruptor de reproducción automática, tocar una canción salta directo a ella
   sin perder el resto, y se actualiza sola al cambiar de tema mientras está abierta.
 

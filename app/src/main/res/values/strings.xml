@@ -58,4 +58,21 @@
     <string name="chip_all">Todo</string>
     <string name="chip_music">Música</string>
     <string name="chip_podcasts">Podcasts</string>
+    <string name="more">Más opciones</string>
+    <string name="cover">Carátula</string>
+    <string name="share">Compartir</string>
+    <string name="playing_from">REPRODUCIENDO DESDE %1$s</string>
+    <string name="this_phone">Este teléfono</string>
+    <string name="sleep_end_short">fin del tema</string>
+    <string name="ctx_liked">TUS ME GUSTA</string>
+    <string name="ctx_playlist">PLAYLIST</string>
+    <string name="ctx_album">ÁLBUM</string>
+    <string name="ctx_artist">ARTISTA</string>
+    <string name="ctx_podcast">PODCAST</string>
+    <string name="ctx_radio">RADIO</string>
+    <string name="ctx_song">CANCIÓN</string>
+    <string name="start_radio">Iniciar radio</string>
+    <string name="add_to_playlist">Agregar a una playlist</string>
+    <string name="go_album">Ir al álbum</string>
+    <string name="go_artist">Ir al artista</string>
 </resources>

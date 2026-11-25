@@ -50,7 +50,7 @@ Inspirada en la app oficial, pero pensada para gama baja (un solo ListView por p
 - **Crear playlist** y **Agregar a una playlist** desde el menú de cualquier canción (mantener apretado).
 - **Cola y reproducción automática**: al terminar lo que elegiste, sigue con canciones similares (el autoplay de Spotify, resuelto por el motor). **Iniciar radio** desde cualquier canción. En la Cola, tocar una canción salta hasta ella.
 - **Mini reproductor** flotante teñido con el color de la carátula (calculado de la miniatura de 64 px), con ♥ y play.
-- **Sonando**: carátula, display LCD retro, controles, volumen y acceso a la **Cola**.
+- **Sonando**: fondo teñido con el color de la carátula, "Reproduciendo desde" la playlist o radio, deslizar la carátula para cambiar de tema, dispositivo donde suena, temporizador, compartir, menú ⋮ (radio, agregar a playlist, ir al álbum/artista) y acceso a la **Cola**.
 - Listas paginadas a demanda: ningún pedido que no hayas pedido vos.
 
 ## Búsqueda y biblioteca (Web API)

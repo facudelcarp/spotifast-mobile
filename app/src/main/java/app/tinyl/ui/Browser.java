@@ -573,11 +573,11 @@ final class Browser {
                 return;
             case PLAY_ALL:
                 NativeEngine.command("set_shuffle", "enabled", false);
-                play(p.contextUri, null);
+                play(p.contextUri, null, p.title);
                 return;
             case SHUFFLE_ALL:
                 NativeEngine.command("set_shuffle", "enabled", true);
-                play(p.contextUri, null);
+                play(p.contextUri, null, p.title);
                 return;
             case PREFETCH:
                 prefetch(p);
@@ -591,7 +591,7 @@ final class Browser {
                 render();
                 return;
             case RADIO:
-                startRadio(it.uri);
+                startRadio(it.uri, EngineState.get().title);
                 return;
             case "header":
                 return;
@@ -608,15 +608,16 @@ final class Browser {
             // Podcasts: retomar donde quedaste (salvo que ya lo hayas terminado).
             long pos = it.fullyPlayed ? 0 : Math.max(0, it.resumeMs - 3000);
             EngineState.get().contextUri = it.uri;
+            EngineState.get().contextTitle = p.title;
             NativeEngine.command("play", "uri", it.uri, "position_ms", pos);
             return;
         }
         if (it.isPlayable()) {
             // Dentro de un álbum/playlist: arranca en esta pista y sigue con el resto.
             if (p.contextUri != null && !p.contextUri.contains(":artist:")) {
-                play(p.contextUri, it.uri);
+                play(p.contextUri, it.uri, p.title);
             } else {
-                play(it.uri, null);
+                play(it.uri, null, it.title);
             }
         } else {
             open(it);
@@ -645,7 +646,7 @@ final class Browser {
             actions.add(new Runnable() {
                 @Override
                 public void run() {
-                    play(it.uri, null);
+                    play(it.uri, null, it.title);
                 }
             });
         }
@@ -654,7 +655,7 @@ final class Browser {
             actions.add(new Runnable() {
                 @Override
                 public void run() {
-                    startRadio(it.uri);
+                    startRadio(it.uri, it.title);
                 }
             });
         }
@@ -770,7 +771,7 @@ final class Browser {
     }
 
     /** Elegir una de tus playlists y agregarle la canción. */
-    private void pickPlaylist(final WebApi.Item track) {
+    void pickPlaylist(final WebApi.Item track) {
         api.myOwnedPlaylists(EngineState.get().username, new WebApi.Result() {
             @Override
             public void onItems(final List<WebApi.Item> lists, String next) {
@@ -853,18 +854,20 @@ final class Browser {
     }
 
     /** Radio: esa canción y después similares (autoplay de Spotify), aunque esté apagado. */
-    private void startRadio(String trackUri) {
+    void startRadio(String trackUri, String trackTitle) {
         EngineState.get().contextUri = trackUri;
+        EngineState.get().contextTitle = "Radio de " + trackTitle;
         NativeEngine.command("radio", "uri", trackUri);
         Toast.makeText(activity, "Radio: después siguen canciones similares", Toast.LENGTH_SHORT).show();
         reloadQueueSoon();
     }
 
-    private static void play(String uri, String offsetUri) {
+    private static void play(String uri, String offsetUri, String contextTitle) {
         if (uri == null) {
             return;
         }
         EngineState.get().contextUri = uri;
+        EngineState.get().contextTitle = contextTitle == null ? "" : contextTitle;
         if (offsetUri != null) {
             NativeEngine.command("play", "uri", uri, "offset_uri", offsetUri);
         } else {

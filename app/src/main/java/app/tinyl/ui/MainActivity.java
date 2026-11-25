@@ -38,7 +38,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Prefs prefs;
-    private TextView status, time, duration, badge, title, subtitle, empty, loginError, pairInfo;
+    private TextView status, time, duration, title, subtitle, empty, loginError, pairInfo;
     private android.widget.Button pairButton;
     private ImageView cover;
     private ImageButton play, shuffle, repeat;
@@ -100,7 +100,6 @@ public final class MainActivity extends Activity implements EngineState.Observer
         status = (TextView) findViewById(R.id.status);
         time = (TextView) findViewById(R.id.time);
         duration = (TextView) findViewById(R.id.duration);
-        badge = (TextView) findViewById(R.id.badge);
         title = (TextView) findViewById(R.id.title);
         subtitle = (TextView) findViewById(R.id.subtitle);
         empty = (TextView) findViewById(R.id.empty);
@@ -264,6 +263,19 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 toggleLike();
             }
         });
+        click(R.id.np_share, new Runnable() {
+            @Override
+            public void run() {
+                shareCurrent();
+            }
+        });
+        click(R.id.np_more, new Runnable() {
+            @Override
+            public void run() {
+                nowPlayingMenu();
+            }
+        });
+        coverSwipe();
         click(R.id.np_queue, new Runnable() {
             @Override
             public void run() {
@@ -302,7 +314,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
             @Override
             public void run() {
                 float d = getResources().getDisplayMetrics().density;
-                int controls = (int) (400 * d); // encabezado + LCD + título + barra + botones + volumen
+                // encabezado + título + barra + tiempos + botones (acciones y volumen pueden quedar abajo)
+                int controls = (int) (300 * d);
                 int free = nowPlaying.getHeight() > 0 ? nowPlaying.getHeight()
                         : getResources().getDisplayMetrics().heightPixels;
                 int size = Math.max((int) (120 * d), Math.min(cover.getWidth(), free - controls));
@@ -427,6 +440,11 @@ public final class MainActivity extends Activity implements EngineState.Observer
     }
 
     static final int DEMO_HOME = 0, DEMO_SEARCH = 1, DEMO_LIBRARY = 2;
+
+    /** Modo demo: tono de carátula de ejemplo (sin red no hay carátula de la que sacarlo). */
+    void demoTone(int color) {
+        tintMini(color);
+    }
 
     /** Modo demo: letra de ejemplo para revisar la pantalla sin cuenta. */
     void demoLyrics(app.tinyl.lyrics.Lyrics l) {
@@ -942,10 +960,225 @@ public final class MainActivity extends Activity implements EngineState.Observer
             return;
         }
         miniColor = color;
+        tintNowPlaying(color);
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setCornerRadius(8 * getResources().getDisplayMetrics().density);
         bg.setColor(color == 0 ? getResources().getColor(R.color.panel_hi) : color);
         mini.setBackgroundDrawable(bg);
+    }
+
+    // ------------------------------------------------------------------ Sonando
+
+    /** Encabezado ("reproduciendo desde …") y fila de acciones (dispositivo, temporizador). */
+    private void renderNowPlayingBars(EngineState s) {
+        TextView from = (TextView) findViewById(R.id.status_np);
+        TextView ctx = (TextView) findViewById(R.id.np_context);
+        String kind = contextKind(s);
+        if (kind == null) {
+            from.setText(R.string.now_playing);
+            ctx.setVisibility(View.GONE);
+        } else {
+            from.setText(getString(R.string.playing_from, kind));
+            String name = s.contextTitle;
+            ctx.setText(name);
+            ctx.setVisibility(name.length() > 0 && !name.equals(s.title) ? View.VISIBLE : View.GONE);
+        }
+
+        boolean remote = s.remoteDevice.length() > 0;
+        int devColor = getResources().getColor(remote ? R.color.accent : R.color.text);
+        ((ImageView) findViewById(R.id.np_devices_icon)).setColorFilter(devColor);
+        ((ImageButton) findViewById(R.id.mini_device)).setColorFilter(devColor);
+        TextView dev = (TextView) findViewById(R.id.np_device_name);
+        dev.setText(remote ? s.remoteDevice : getString(R.string.this_phone));
+        dev.setTextColor(getResources().getColor(remote ? R.color.accent : R.color.muted));
+
+        boolean sleeping = s.sleepAt > 0 || s.sleepEndOfTrack;
+        TextView left = (TextView) findViewById(R.id.np_timer_left);
+        left.setVisibility(sleeping ? View.VISIBLE : View.GONE);
+        if (s.sleepAt > 0) {
+            long min = Math.max(1, (s.sleepAt - android.os.SystemClock.elapsedRealtime() + 59_999) / 60_000);
+            left.setText(min + " min");
+        } else if (s.sleepEndOfTrack) {
+            left.setText(R.string.sleep_end_short);
+        }
+        ((ImageButton) findViewById(R.id.np_timer)).setColorFilter(getResources().getColor(
+                sleeping ? R.color.accent : R.color.text));
+    }
+
+    /** De dónde viene lo que suena, según el URI del contexto; null si no se sabe. */
+    private String contextKind(EngineState s) {
+        String u = s.contextUri;
+        if (u.length() == 0) {
+            return null;
+        }
+        if (u.contains(":collection")) {
+            return getString(R.string.ctx_liked);
+        }
+        if (u.contains(":playlist:")) {
+            return getString(R.string.ctx_playlist);
+        }
+        if (u.contains(":album:")) {
+            return getString(R.string.ctx_album);
+        }
+        if (u.contains(":artist:")) {
+            return getString(R.string.ctx_artist);
+        }
+        if (u.contains(":show:") || u.contains(":episode:")) {
+            return getString(R.string.ctx_podcast);
+        }
+        if (u.contains(":track:")) {
+            return getString(s.contextTitle.startsWith("Radio") ? R.string.ctx_radio : R.string.ctx_song);
+        }
+        return null;
+    }
+
+    /** Sin carátula (o modo demo): el logo de Tinyl centrado sobre el fondo gris. */
+    private void coverPlaceholder() {
+        int p = Math.max(cover.getWidth(), cover.getLayoutParams().width) / 4;
+        cover.setPadding(p, p, p, p);
+        cover.setImageResource(R.drawable.ic_launcher);
+    }
+
+    /** Deslizar la carátula: a la izquierda la siguiente, a la derecha la anterior (como Spotify). */
+    private void coverSwipe() {
+        final float min = 64 * getResources().getDisplayMetrics().density;
+        cover.setOnTouchListener(new View.OnTouchListener() {
+            float x0, y0;
+
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent e) {
+                switch (e.getAction()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        x0 = e.getX();
+                        y0 = e.getY();
+                        return true;
+                    case android.view.MotionEvent.ACTION_UP:
+                        float dx = e.getX() - x0;
+                        if (Math.abs(dx) > min && Math.abs(dx) > 2 * Math.abs(e.getY() - y0)) {
+                            v.animate().translationX(dx > 0 ? min : -min).alpha(0.4f).setDuration(120)
+                                    .withEndAction(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            cover.setTranslationX(0);
+                                            cover.setAlpha(1f);
+                                        }
+                                    });
+                            NativeEngine.command(dx < 0 ? "skip_next" : "skip_prev");
+                        }
+                        return true;
+                    default:
+                        return true;
+                }
+            }
+        });
+    }
+
+    /** Compartir el enlace de open.spotify.com (sin red: se arma del URI). */
+    private void shareCurrent() {
+        EngineState s = EngineState.get();
+        String[] part = s.uri.split(":");
+        if (part.length < 3) {
+            return;
+        }
+        String url = "https://open.spotify.com/" + part[1] + "/" + part[2];
+        Intent i = new Intent(Intent.ACTION_SEND);
+        i.setType("text/plain");
+        i.putExtra(Intent.EXTRA_TEXT, s.title + (s.artist.length() > 0 ? " · " + s.artist : "") + "\n" + url);
+        startActivity(Intent.createChooser(i, getString(R.string.share)));
+    }
+
+    /** "⋮" de Sonando: lo que en Spotify está en el menú de la canción. */
+    private void nowPlayingMenu() {
+        final EngineState s = EngineState.get();
+        if (s.uri.length() == 0) {
+            return;
+        }
+        final boolean track = s.uri.startsWith("spotify:track:");
+        final java.util.List<String> labels = new java.util.ArrayList<>();
+        final java.util.List<Runnable> actions = new java.util.ArrayList<>();
+        if (track) {
+            labels.add(getString(R.string.start_radio));
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    browser.startRadio(s.uri, s.title);
+                }
+            });
+            labels.add(getString(R.string.add_to_playlist));
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    browser.pickPlaylist(WebApi.Item.make(s.uri, s.title, s.artist, "track"));
+                }
+            });
+            labels.add(getString(R.string.go_album));
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    showNowPlaying(false);
+                    browser.openNowPlaying(false);
+                }
+            });
+            labels.add(getString(R.string.go_artist));
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    showNowPlaying(false);
+                    browser.openNowPlaying(true);
+                }
+            });
+        }
+        labels.add(getString(R.string.share));
+        actions.add(new Runnable() {
+            @Override
+            public void run() {
+                shareCurrent();
+            }
+        });
+        labels.add(getString(R.string.sleep_timer));
+        actions.add(new Runnable() {
+            @Override
+            public void run() {
+                pickSleep();
+            }
+        });
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(s.title)
+                .setItems(labels.toArray(new String[0]), new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        actions.get(which).run();
+                    }
+                })
+                .show();
+    }
+
+    /**
+     * Fondo de Sonando teñido con el color de la carátula (como Spotify), que se funde a negro.
+     * Un gradiente de 3 colores: no cuesta nada dibujarlo. 0 = fondo verde de Tinyl.
+     */
+    private void tintNowPlaying(int color) {
+        if (nowPlaying == null || lyricsView == null || lyricsCard == null) {
+            return;
+        }
+        if (color == 0) {
+            nowPlaying.setBackgroundResource(R.drawable.np_bg);
+            lyricsView.setBackgroundResource(R.drawable.np_bg);
+            lyricsCard.setBackgroundResource(R.drawable.card_bg);
+            return;
+        }
+        int mid = android.graphics.Color.rgb(android.graphics.Color.red(color) / 3,
+                android.graphics.Color.green(color) / 3, android.graphics.Color.blue(color) / 3);
+        nowPlaying.setBackgroundDrawable(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{color, mid, 0xFF000000}));
+        lyricsView.setBackgroundDrawable(new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{color, mid}));
+        android.graphics.drawable.GradientDrawable card = new android.graphics.drawable.GradientDrawable();
+        card.setCornerRadius(12 * getResources().getDisplayMetrics().density);
+        card.setColor(color);
+        lyricsCard.setBackgroundDrawable(card);
     }
 
     /** Ayudante mínimo para centrar la carátula con un tamaño fijo. */
@@ -1050,6 +1283,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         refreshLike(s);
         if (s.loggedIn && pendingUri != null) {
+            s.contextUri = pendingUri;
+            s.contextTitle = "";
             NativeEngine.command("play", "uri", pendingUri);
             pendingUri = null;
         }
@@ -1078,22 +1313,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         status.setText(st);
         status.setTextColor(getResources().getColor(s.loggedIn ? R.color.accent : R.color.muted));
-        TextView npStatus = (TextView) findViewById(R.id.status_np);
-        if (s.sleepAt > 0) {
-            long min = Math.max(1, (s.sleepAt - android.os.SystemClock.elapsedRealtime() + 59_999) / 60_000);
-            npStatus.setText("SE PAUSA EN " + min + " MIN");
-        } else if (s.sleepEndOfTrack) {
-            npStatus.setText("SE PAUSA AL TERMINAR");
-        } else if (s.remoteDevice.length() > 0) {
-            npStatus.setText("EN " + s.remoteDevice.toUpperCase());
-        } else {
-            npStatus.setText(R.string.now_playing);
-        }
-        ((ImageButton) findViewById(R.id.np_timer)).setColorFilter(getResources().getColor(
-                s.sleepAt > 0 || s.sleepEndOfTrack ? R.color.accent : R.color.text));
-        int devColor = getResources().getColor(s.remoteDevice.length() > 0 ? R.color.accent : R.color.text);
-        ((ImageButton) findViewById(R.id.np_devices)).setColorFilter(devColor);
-        ((ImageButton) findViewById(R.id.mini_device)).setColorFilter(devColor);
+        renderNowPlayingBars(s);
         if (nowPlaying.getVisibility() == View.VISIBLE && !s.uri.equals(lyricsUri)) {
             loadLyrics(s);
         }
@@ -1104,8 +1324,10 @@ public final class MainActivity extends Activity implements EngineState.Observer
             sub = sub.length() > 0 ? sub + " · " + s.album : s.album;
         }
         subtitle.setText(sub);
-        duration.setText(s.durationMs > 0 ? "/ " + fmt(s.durationMs) : "");
-        badge.setText("buffering".equals(s.status) ? "BUF" : s.isPlaying() ? "PLAY" : "paused".equals(s.status) ? "PAUSE" : "");
+        duration.setText(s.durationMs > 0 ? fmt(s.durationMs) : "");
+        if (!title.isSelected()) {
+            title.setSelected(true); // marquesina para títulos largos
+        }
 
         play.setImageResource(s.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play);
         miniPlay.setImageResource(s.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play);
@@ -1125,14 +1347,24 @@ public final class MainActivity extends Activity implements EngineState.Observer
         // Imágenes: 64 px en el mini reproductor, 300 px solo en "Sonando". Modo ahorro: ninguna.
         boolean eco = prefs.eco();
         cover.setVisibility(eco ? View.GONE : View.VISIBLE);
-        if (!eco && s.coverDefault != null && !s.coverDefault.equals(shownCover)
-                && nowPlaying.getVisibility() == View.VISIBLE) {
-            shownCover = s.coverDefault;
-            CoverLoader.into(cover, s.coverDefault);
+        if (!eco && nowPlaying.getVisibility() == View.VISIBLE) {
+            if (s.coverDefault == null) {
+                if (shownCover != null || cover.getDrawable() == null) {
+                    shownCover = null;
+                    coverPlaceholder();
+                }
+            } else if (!s.coverDefault.equals(shownCover)) {
+                shownCover = s.coverDefault;
+                cover.setPadding(0, 0, 0, 0);
+                cover.setImageDrawable(null);
+                CoverLoader.into(cover, s.coverDefault);
+            }
         }
         if (eco || s.coverSmall == null) {
+            if (shownMiniCover != null) { // recién se fue la carátula: volver al color neutro
+                tintMini(0);
+            }
             shownMiniCover = null;
-            tintMini(0);
             int p = (int) (12 * getResources().getDisplayMetrics().density);
             miniCover.setPadding(p, p, p, p);
             // Sin carátula: el logo de Tinyl en vez de una nota genérica.

@@ -47,6 +47,8 @@ final class Demo {
             s.onEngineEvent("position_sync", new JSONObject("{\"position\":{\"position_ms\":83000,"
                     + "\"timestamp_ms\":" + System.currentTimeMillis() + ",\"speed\":1.0}}"));
             s.onEngineEvent("volume_changed", new JSONObject("{\"volume\":70}"));
+            s.contextUri = "spotify:playlist:a";
+            s.contextTitle = "Para el viaje";
         } catch (Exception ignored) {
         }
         List<WebApi.Item> tracks = new ArrayList<>();
@@ -123,6 +125,7 @@ final class Demo {
                 l.lines.add(new app.tinyl.lyrics.Lyrics.Line(60000 + i * 9000L, words[i]));
             }
             a.demoLyrics(l);
+            a.demoTone(0xFF6B3324);
         }
         if ("playing".equals(mode) || "lyrics".equals(mode)) {
             a.findViewById(app.tinyl.R.id.mini).performClick();
