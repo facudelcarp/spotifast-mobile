@@ -63,6 +63,11 @@ public final class SettingsActivity extends Activity {
         autoplay.setChecked(prefs.autoplay());
         root.addView(autoplay);
 
+        final CheckBox artBg = new CheckBox(this);
+        artBg.setText(R.string.art_background);
+        artBg.setChecked(prefs.artBackground());
+        root.addView(artBg);
+
         final EditText cache = field(root, R.string.cache, String.valueOf(prefs.cacheMb()), InputType.TYPE_CLASS_NUMBER);
         final TextView cacheUse = new TextView(this);
         cacheUse.setTextSize(12);
@@ -147,6 +152,7 @@ public final class SettingsActivity extends Activity {
                 prefs.setBitrate(quality.getCheckedRadioButtonId());
                 prefs.setEco(eco.isChecked());
                 prefs.setAutoplay(autoplay.isChecked());
+                prefs.setArtBackground(artBg.isChecked());
                 prefs.setCacheMb(parse(cache, 512));
                 prefs.setPrefetchWifiOnly(wifiOnly.isChecked());
                 prefs.setIdleMinutes(Math.max(1, parse(idle, 10)));

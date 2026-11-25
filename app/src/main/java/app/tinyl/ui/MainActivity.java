@@ -961,10 +961,77 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         miniColor = color;
         tintNowPlaying(color);
+        applyMiniBg();
+    }
+
+    /** Fondo del mini reproductor: la carátula (si está activada y cargada) o el tono de color. */
+    private void applyMiniBg() {
+        if (miniArt != null) {
+            mini.setBackgroundDrawable(miniArt);
+            return;
+        }
         android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
         bg.setCornerRadius(8 * getResources().getDisplayMetrics().density);
-        bg.setColor(color == 0 ? getResources().getColor(R.color.panel_hi) : color);
+        bg.setColor(miniColor == 0 ? getResources().getColor(R.color.panel_hi) : miniColor);
         mini.setBackgroundDrawable(bg);
+    }
+
+    private android.graphics.drawable.Drawable miniArt;
+    private String shownMiniArt;
+
+    /**
+     * Carátula de fondo (como el control multimedia de Samsung): se recorta una franja central con
+     * la proporción del mini reproductor (sin deformar) y se oscurece a la izquierda para leer el
+     * título. Un recorte por canción; la imagen es la misma de 300 px de Sonando y la notificación.
+     */
+    private void miniArtBackground(EngineState s, boolean eco) {
+        final String url = !eco && prefs.artBackground() ? s.coverDefault : null;
+        if (url == null ? shownMiniArt == null : url.equals(shownMiniArt)) {
+            return;
+        }
+        shownMiniArt = url;
+        miniArt = null;
+        applyMiniBg();
+        if (url == null) {
+            return;
+        }
+        CoverLoader.load(url, new CoverLoader.Cb() {
+            @Override
+            public void onBitmap(android.graphics.Bitmap b) {
+                int w = mini.getWidth(), h = mini.getHeight();
+                if (!url.equals(shownMiniArt)) {
+                    return;
+                }
+                if (w == 0 || h == 0) { // todavía sin medir: reintentar apenas se mida
+                    shownMiniArt = null;
+                    mini.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+                        @Override
+                        public void onLayoutChange(View v, int l, int t, int r, int bo,
+                                                   int ol, int ot, int or, int ob) {
+                            if (r - l > 0) {
+                                mini.removeOnLayoutChangeListener(this);
+                                render(EngineState.get());
+                            }
+                        }
+                    });
+                    return;
+                }
+                int bw = b.getWidth();
+                int bh = Math.max(1, Math.min(b.getHeight(), bw * h / w));
+                android.graphics.Bitmap band = android.graphics.Bitmap.createBitmap(
+                        b, 0, (b.getHeight() - bh) / 2, bw, bh);
+                android.graphics.drawable.BitmapDrawable art =
+                        new android.graphics.drawable.BitmapDrawable(getResources(), band);
+                art.setFilterBitmap(true);
+                android.graphics.drawable.GradientDrawable shade = new android.graphics.drawable.GradientDrawable(
+                        android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                        new int[]{0xD9000000, 0x8C000000, 0x59000000});
+                miniArt = new android.graphics.drawable.LayerDrawable(
+                        new android.graphics.drawable.Drawable[]{art, shade});
+                Round.clip(mini, 8 * getResources().getDisplayMetrics().density);
+                applyMiniBg();
+            }
+        });
     }
 
     // ------------------------------------------------------------------ Sonando
@@ -1387,6 +1454,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 }
             });
         }
+
+        miniArtBackground(s, eco);
 
         updateClock(s);
         handler.removeCallbacks(tick);

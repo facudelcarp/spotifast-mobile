@@ -60,6 +60,11 @@ public final class CoverLoader {
         return android.graphics.Color.HSVToColor(hsv);
     }
 
+    /** Modo demo: carátula dibujada en el teléfono. */
+    static void put(String url, Bitmap b) {
+        CACHE.put(url, b);
+    }
+
     public static Bitmap cached(String url) {
         return url == null ? null : CACHE.get(url);
     }

@@ -10,9 +10,33 @@ import java.util.UUID;
 public final class Prefs {
 
     private final SharedPreferences p;
+    private final Context ctx;
 
     public Prefs(Context c) {
         p = c.getSharedPreferences("tinyl", Context.MODE_PRIVATE);
+        ctx = c.getApplicationContext();
+    }
+
+    private static Boolean capable;
+
+    /** Teléfono "que se la banca": Android 5+ y que el sistema no lo marque como de poca RAM. */
+    public static boolean capable(Context c) {
+        if (capable == null) {
+            android.app.ActivityManager am =
+                    (android.app.ActivityManager) c.getSystemService(Context.ACTIVITY_SERVICE);
+            capable = Build.VERSION.SDK_INT >= 21 && am != null && !am.isLowRamDevice()
+                    && am.getMemoryClass() >= 128;
+        }
+        return capable;
+    }
+
+    /** Carátula de fondo en el mini reproductor. Por defecto, solo en teléfonos que se la bancan. */
+    public boolean artBackground() {
+        return p.getBoolean("art_bg", capable(ctx));
+    }
+
+    public void setArtBackground(boolean v) {
+        p.edit().putBoolean("art_bg", v).apply();
     }
 
     public String deviceName() {

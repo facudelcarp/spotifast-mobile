@@ -237,6 +237,7 @@ public final class PlayerService extends Service implements EngineState.Observer
         }
         updateSession(s);
         updateNotification(s, playing);
+        fetchArt(s);
         if (!s.running && !s.loggedIn) {
             dropForeground(true);
         }
@@ -455,6 +456,32 @@ public final class PlayerService extends Service implements EngineState.Observer
             unregisterReceiver(noisy);
             noisyRegistered = false;
         }
+    }
+
+    private String artRequested;
+
+    /**
+     * Carátula de 300 px para el control multimedia del sistema (Samsung, Android 11+ y la
+     * pantalla bloqueada la usan de fondo). Una sola descarga por canción (~25 KB), aunque la app
+     * esté cerrada; si después se abre Sonando, sale de la misma caché.
+     */
+    private void fetchArt(EngineState s) {
+        final String url = s.coverDefault;
+        if (prefs.eco() || url == null || url.equals(artRequested) || CoverLoader.cached(url) != null) {
+            return;
+        }
+        artRequested = url;
+        CoverLoader.load(url, new CoverLoader.Cb() {
+            @Override
+            public void onBitmap(Bitmap b) {
+                EngineState now = EngineState.get();
+                if (url.equals(now.coverDefault)) {
+                    lastMetaUri = ""; // forzar a reenviar los metadatos con la imagen
+                    updateSession(now);
+                    updateNotification(now, now.isPlaying() || "buffering".equals(now.status));
+                }
+            }
+        });
     }
 
     private void updateSession(EngineState s) {

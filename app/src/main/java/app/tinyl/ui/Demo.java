@@ -47,6 +47,23 @@ final class Demo {
             s.onEngineEvent("position_sync", new JSONObject("{\"position\":{\"position_ms\":83000,"
                     + "\"timestamp_ms\":" + System.currentTimeMillis() + ",\"speed\":1.0}}"));
             s.onEngineEvent("volume_changed", new JSONObject("{\"volume\":70}"));
+            // Carátula de ejemplo (sin red): un dibujo de colores para probar los fondos.
+            android.graphics.Bitmap art = android.graphics.Bitmap.createBitmap(300, 300,
+                    android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas cv = new android.graphics.Canvas(art);
+            cv.drawColor(0xFFE9E4D8);
+            android.graphics.Paint pt = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            int[] cols = {0xFFD7263D, 0xFF1B998B, 0xFFF46036, 0xFF2E294E, 0xFFC5D86D, 0xFF3A86FF};
+            for (int i = 0; i < 18; i++) {
+                pt.setColor(cols[i % cols.length]);
+                cv.drawCircle((i * 67) % 300, (i * 41 + 30) % 300, 18 + (i * 13) % 50, pt);
+            }
+            CoverLoader.put("demo://cover", art);
+            s.coverDefault = "demo://cover";
+            s.coverSmall = "demo://cover";
+            if ("artbg".equals(mode)) {
+                new Prefs(a).setArtBackground(true);
+            }
             s.contextUri = "spotify:playlist:a";
             s.contextTitle = "Para el viaje";
         } catch (Exception ignored) {

@@ -15,6 +15,10 @@
   bajo la barra), deslizar la carátula para pasar de tema, fila con el dispositivo donde suena,
   temporizador con minutos restantes, compartir enlace y menú ⋮ (radio, agregar a playlist, ir al
   álbum/artista). Títulos largos en marquesina y logo de Tinyl si no hay carátula.
+- **Carátula de fondo en el mini reproductor** (como el control multimedia de Samsung): activada
+  solo en teléfonos con Android 5+ que el sistema no marca como de poca RAM; se cambia en Ajustes.
+- El control multimedia del sistema y la pantalla bloqueada reciben la carátula de 300 px aunque
+  la app esté cerrada (antes solo si se había abierto Sonando).
 - **Cola renovada**: interruptor de reproducción automática, tocar una canción salta directo a ella
   sin perder el resto, y se actualiza sola al cambiar de tema mientras está abierta.
 
