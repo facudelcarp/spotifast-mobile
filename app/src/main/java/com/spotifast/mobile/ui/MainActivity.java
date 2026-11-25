@@ -2,7 +2,6 @@ package com.spotifast.mobile.ui;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -42,7 +41,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Prefs prefs;
-    private TextView status, time, duration, badge, title, subtitle, empty, loginError;
+    private TextView status, time, duration, badge, title, subtitle, empty, loginError, pairInfo;
+    private android.widget.Button pairButton;
     private ImageView cover;
     private ImageButton play, shuffle, repeat;
     private SeekBar seek, volume;
@@ -83,6 +83,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
         volume = (SeekBar) findViewById(R.id.volume);
         loginPanel = findViewById(R.id.login_panel);
         loginError = (TextView) findViewById(R.id.login_error);
+        pairInfo = (TextView) findViewById(R.id.pair_info);
+        pairButton = (android.widget.Button) findViewById(R.id.btn_pair);
         query = (android.widget.EditText) findViewById(R.id.query);
 
         ListView list = (ListView) findViewById(R.id.list);
@@ -136,6 +138,13 @@ public final class MainActivity extends Activity implements EngineState.Observer
             @Override
             public void run() {
                 login();
+            }
+        });
+        click(R.id.btn_pair, new Runnable() {
+            @Override
+            public void run() {
+                loginError.setText("");
+                PlayerService.pair(MainActivity.this, !EngineState.get().pairing);
             }
         });
         query.setOnEditorActionListener(new TextView.OnEditorActionListener() {
@@ -345,6 +354,9 @@ public final class MainActivity extends Activity implements EngineState.Observer
         if (showLogin && s.lastError != null) {
             loginError.setText(s.lastError);
         }
+        pairInfo.setVisibility(s.pairing ? View.VISIBLE : View.GONE);
+        pairInfo.setText(getString(R.string.pair_info, prefs.deviceName()));
+        pairButton.setText(s.pairing ? R.string.pair_cancel : R.string.pair);
 
         String st;
         if (s.loggedIn) {
@@ -397,7 +409,8 @@ public final class MainActivity extends Activity implements EngineState.Observer
     }
 
     private void tint(ImageButton b, boolean on) {
-        b.setImageTintList(ColorStateList.valueOf(getResources().getColor(on ? R.color.accent : R.color.muted)));
+        // setColorFilter en vez de setImageTintList (API 21): funciona en Android 4.4.
+        b.setColorFilter(getResources().getColor(on ? R.color.accent : R.color.muted));
     }
 
     private static String fmt(long ms) {

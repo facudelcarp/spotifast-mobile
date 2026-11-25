@@ -11,6 +11,8 @@
 //! El audio PCM (s16, 44.1 kHz, estéreo) se entrega a Java (`AudioTrack`), que funciona en
 //! cualquier Android >= 5.0 sin depender de AAudio/OpenSL.
 
+mod compat;
+mod net;
 mod sink;
 
 use std::path::PathBuf;
@@ -305,12 +307,21 @@ fn handle_player_event(ev: PlayerEvent) {
     }
 }
 
+enum Auth {
+    /// Credenciales guardadas en data_dir (sesión previa).
+    Cached,
+    /// Token OAuth recién obtenido en el navegador.
+    Token(String),
+    /// Credenciales entregadas por otra app de Spotify vía Spotify Connect (zeroconf).
+    Credentials(Credentials),
+}
+
 struct StartParams {
     data_dir: PathBuf,
     cache_dir: PathBuf,
     device_name: String,
     device_id: String,
-    access_token: Option<String>,
+    auth: Auth,
     bitrate: i32,
     volume: i32,
     cache_mb: i32,
@@ -321,9 +332,10 @@ async fn run_engine(p: StartParams) -> Result<(), Error> {
     let size_limit = if p.cache_mb > 0 { Some(p.cache_mb as u64 * 1024 * 1024) } else { None };
     let cache = Cache::new(Some(&p.data_dir), Some(&p.data_dir), Some(&audio_dir), size_limit)?;
 
-    let credentials = match p.access_token {
-        Some(t) => Credentials::with_access_token(t),
-        None => cache
+    let credentials = match p.auth {
+        Auth::Token(t) => Credentials::with_access_token(t),
+        Auth::Credentials(c) => c,
+        Auth::Cached => cache
             .credentials()
             .ok_or_else(|| Error::unauthenticated("no hay sesión guardada: iniciá sesión"))?,
     };
@@ -537,6 +549,59 @@ fn request_token(scopes: String, req_id: i32) {
     });
 }
 
+// ---------------------------------------------------------------- login por Spotify Connect
+
+static PAIRING_CANCEL: Mutex<Option<tokio::sync::oneshot::Sender<()>>> = Mutex::new(None);
+
+/// Publica el teléfono como dispositivo Spotify Connect en la Wi-Fi (mDNS) hasta que otra app
+/// de Spotify lo elige; esa app le entrega credenciales y se arranca el motor con ellas.
+/// Es el mismo mecanismo con el que se empareja Soloist. Pensado para Android viejos cuyo
+/// navegador no puede abrir la página de login de Spotify.
+fn start_pairing(p: StartParams, ip: String) {
+    use futures_util::StreamExt;
+    use librespot_discovery::Discovery;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    if let Some(old) = PAIRING_CANCEL.lock().unwrap_or_else(|e| e.into_inner()).replace(tx) {
+        let _ = old.send(());
+    }
+    runtime().spawn(async move {
+        let mut builder = Discovery::builder(p.device_id.clone(), CLIENT_ID.to_string())
+            .name(p.device_name.clone())
+            .device_type(DeviceType::Smartphone);
+        if let Ok(addr) = ip.parse::<std::net::IpAddr>() {
+            builder = builder.zeroconf_ip(vec![addr]);
+        }
+        let mut discovery = match builder.launch() {
+            Ok(d) => d,
+            Err(e) => {
+                return emit(json!({"type": "pairing", "state": "error", "message": e.to_string()}));
+            }
+        };
+        emit(json!({"type": "pairing", "state": "waiting", "device_name": p.device_name}));
+        let timeout = tokio::time::sleep(std::time::Duration::from_secs(600));
+        let creds = tokio::select! {
+            c = discovery.next() => c,
+            _ = rx => None,
+            _ = timeout => None,
+        };
+        discovery.shutdown().await;
+        match creds {
+            Some(c) => {
+                emit(json!({"type": "pairing", "state": "done"}));
+                start_engine(StartParams { auth: Auth::Credentials(c), ..p });
+            }
+            None => emit(json!({"type": "pairing", "state": "stopped"})),
+        }
+    });
+}
+
+fn stop_pairing() {
+    if let Some(tx) = PAIRING_CANCEL.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        let _ = tx.send(());
+    }
+}
+
 // ---------------------------------------------------------------- JNI
 
 fn jstr(env: &mut JNIEnv, s: &JString) -> String {
@@ -603,7 +668,7 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStart
         cache_dir: PathBuf::from(jstr(&mut env, &cache_dir)),
         device_name: jstr(&mut env, &device_name),
         device_id: jstr(&mut env, &device_id),
-        access_token: if token.is_empty() { None } else { Some(token) },
+        auth: if token.is_empty() { Auth::Cached } else { Auth::Token(token) },
         bitrate,
         volume,
         cache_mb,
@@ -640,4 +705,59 @@ pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeReque
 ) {
     let scopes = jstr(&mut env, &scopes);
     request_token(scopes, req_id);
+}
+
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStartPairing(
+    mut env: JNIEnv,
+    _class: JClass,
+    data_dir: JString,
+    cache_dir: JString,
+    device_name: JString,
+    device_id: JString,
+    wifi_ip: JString,
+    bitrate: jint,
+    volume: jint,
+    cache_mb: jint,
+) {
+    let ip = jstr(&mut env, &wifi_ip);
+    start_pairing(
+        StartParams {
+            data_dir: PathBuf::from(jstr(&mut env, &data_dir)),
+            cache_dir: PathBuf::from(jstr(&mut env, &cache_dir)),
+            device_name: jstr(&mut env, &device_name),
+            device_id: jstr(&mut env, &device_id),
+            auth: Auth::Cached,
+            bitrate,
+            volume,
+            cache_mb,
+        },
+        ip,
+    );
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeStopPairing(
+    _env: JNIEnv,
+    _class: JClass,
+) {
+    stop_pairing();
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_spotifast_mobile_engine_NativeEngine_nativeHttp(
+    mut env: JNIEnv,
+    _class: JClass,
+    method: JString,
+    url: JString,
+    headers: JString,
+    body: JString,
+    req_id: jint,
+) {
+    let method = jstr(&mut env, &method);
+    let url = jstr(&mut env, &url);
+    let headers = jstr(&mut env, &headers);
+    let body = jstr(&mut env, &body);
+    runtime().spawn(net::request(method, url, headers, body, req_id));
 }

@@ -46,6 +46,8 @@ public final class EngineState implements NativeEngine.Listener {
     public boolean shuffle;
     public String repeat = "off";
     public String lastError;
+    /** true mientras se espera que otra app de Spotify elija este teléfono (login alternativo). */
+    public boolean pairing;
 
     private long positionMs;
     private long anchorElapsed; // SystemClock.elapsedRealtime() del último position_sync
@@ -73,6 +75,12 @@ public final class EngineState implements NativeEngine.Listener {
             p = durationMs;
         }
         return Math.max(0, p);
+    }
+
+    public void markPairing() {
+        pairing = true;
+        lastError = null;
+        notifyObservers();
     }
 
     public void markStarting() {
@@ -131,6 +139,15 @@ public final class EngineState implements NativeEngine.Listener {
                 running = false;
                 loggedIn = false;
                 lastError = ev.optString("message");
+                break;
+            case "pairing":
+                String st = ev.optString("state");
+                pairing = "waiting".equals(st);
+                if ("done".equals(st)) {
+                    running = true; // el motor arranca con las credenciales recibidas
+                } else if ("error".equals(st)) {
+                    lastError = ev.optString("message");
+                }
                 break;
             case "error":
                 lastError = ev.optString("message");

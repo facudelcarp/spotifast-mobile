@@ -3,6 +3,7 @@ package com.spotifast.mobile.engine;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.util.SparseArray;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,10 +23,17 @@ public final class NativeEngine {
         void onEngineEvent(String type, JSONObject event);
     }
 
+    /** Respuesta HTTP. {@code status} 0 = error de red (el cuerpo trae el mensaje). */
+    public interface HttpCallback {
+        void onResponse(int status, byte[] body);
+    }
+
     private static final String TAG = "spotifast";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final CopyOnWriteArrayList<Listener> LISTENERS = new CopyOnWriteArrayList<>();
     private static volatile AudioOut audio;
+    private static final SparseArray<HttpCallback> HTTP = new SparseArray<>();
+    private static int nextHttpId = 1;
 
     static {
         System.loadLibrary("spotifast");
@@ -50,6 +58,15 @@ public final class NativeEngine {
 
     private static native void nativeRequestToken(String scopes, int reqId);
 
+    private static native void nativeStartPairing(String dataDir, String cacheDir, String deviceName,
+                                                  String deviceId, String wifiIp, int bitrate,
+                                                  int volume, int cacheMb);
+
+    private static native void nativeStopPairing();
+
+    private static native void nativeHttp(String method, String url, String headersJson,
+                                          String body, int reqId);
+
     // ---- API Java
     public static boolean hasCredentials(String dataDir) {
         return nativeHasCredentials(dataDir);
@@ -67,6 +84,30 @@ public final class NativeEngine {
 
     public static void requestToken(String scopes, int reqId) {
         nativeRequestToken(scopes, reqId);
+    }
+
+    /** Login alternativo: esperar a que otra app de Spotify en la misma Wi-Fi elija este equipo. */
+    public static void startPairing(String dataDir, String cacheDir, String deviceName, String deviceId,
+                                    String wifiIp, int bitrate, int volume, int cacheMb) {
+        nativeStartPairing(dataDir, cacheDir, deviceName, deviceId, wifiIp == null ? "" : wifiIp,
+                bitrate, volume, cacheMb);
+    }
+
+    public static void stopPairing() {
+        nativeStopPairing();
+    }
+
+    /**
+     * HTTPS hecho por el motor (rustls con certificados propios): funciona igual en Android 4.4,
+     * que trae TLS 1.2 apagado y certificados raíz viejos. El callback llega en el hilo principal.
+     */
+    public static void http(String method, String url, JSONObject headers, String body, HttpCallback cb) {
+        int id;
+        synchronized (HTTP) {
+            id = nextHttpId++;
+            HTTP.put(id, cb);
+        }
+        nativeHttp(method, url, headers == null ? "{}" : headers.toString(), body == null ? "" : body, id);
     }
 
     /** Envía un comando Soloist. {@code kv} son pares clave/valor opcionales. */
@@ -112,6 +153,23 @@ public final class NativeEngine {
                 for (Listener l : LISTENERS) {
                     l.onEngineEvent(type, ev);
                 }
+            }
+        });
+    }
+
+    static void onHttp(int reqId, final int status, final byte[] body) {
+        final HttpCallback cb;
+        synchronized (HTTP) {
+            cb = HTTP.get(reqId);
+            HTTP.remove(reqId);
+        }
+        if (cb == null) {
+            return;
+        }
+        MAIN.post(new Runnable() {
+            @Override
+            public void run() {
+                cb.onResponse(status, body);
             }
         });
     }

@@ -7,17 +7,16 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
 
+import com.spotifast.mobile.engine.NativeEngine;
+
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -79,12 +78,11 @@ public final class SpotifyAuth {
             @Override
             public void run() {
                 try {
-                    String code = awaitCode(state);
-                    final String token = exchange(code, verifier);
+                    final String code = awaitCode(state);
                     main.post(new Runnable() {
                         @Override
                         public void run() {
-                            cb.onToken(token);
+                            exchange(code, verifier, cb);
                         }
                     });
                 } catch (final Exception e) {
@@ -146,41 +144,41 @@ public final class SpotifyAuth {
         o.flush();
     }
 
-    private static String exchange(String code, String verifier) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL("https://accounts.spotify.com/api/token").openConnection();
-        c.setRequestMethod("POST");
-        c.setDoOutput(true);
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(15000);
-        c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+    /** El canje del código se hace por el motor (TLS propio): anda también en Android 4.4. */
+    private static void exchange(String code, String verifier, final Callback cb) {
         String body = "grant_type=authorization_code&code=" + enc(code)
                 + "&redirect_uri=" + enc(REDIRECT) + "&client_id=" + CLIENT_ID
                 + "&code_verifier=" + enc(verifier);
-        OutputStream o = c.getOutputStream();
-        o.write(body.getBytes("UTF-8"));
-        o.close();
-        int status = c.getResponseCode();
-        String text = read(status < 400 ? c.getInputStream() : c.getErrorStream());
-        c.disconnect();
-        if (status >= 400) {
-            throw new Exception("Spotify rechazó el login (" + status + "): " + text);
+        JSONObject headers = new JSONObject();
+        try {
+            headers.put("Content-Type", "application/x-www-form-urlencoded");
+        } catch (Exception ignored) {
         }
-        return new JSONObject(text).getString("access_token");
+        NativeEngine.http("POST", "https://accounts.spotify.com/api/token", headers, body,
+                new NativeEngine.HttpCallback() {
+                    @Override
+                    public void onResponse(int status, byte[] data) {
+                        String text = utf8(data);
+                        if (status < 200 || status >= 300) {
+                            cb.onError(status == 0 ? "Sin conexión: " + text
+                                    : "Spotify rechazó el login (" + status + "): " + text);
+                            return;
+                        }
+                        try {
+                            cb.onToken(new JSONObject(text).getString("access_token"));
+                        } catch (Exception e) {
+                            cb.onError("Respuesta inválida de Spotify");
+                        }
+                    }
+                });
     }
 
-    static String read(InputStream in) throws Exception {
-        if (in == null) {
+    static String utf8(byte[] b) {
+        try {
+            return b == null ? "" : new String(b, "UTF-8");
+        } catch (Exception e) {
             return "";
         }
-        BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        char[] buf = new char[4096];
-        int n;
-        while ((n = r.read(buf)) > 0) {
-            sb.append(buf, 0, n);
-        }
-        r.close();
-        return sb.toString();
     }
 
     private static void closeServer() {

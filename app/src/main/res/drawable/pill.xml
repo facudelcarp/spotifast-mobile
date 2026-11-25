@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33000000">
-    <item>
-        <shape>
-            <solid android:color="@color/accent" />
-            <corners android:radius="24dp" />
-        </shape>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape><solid android:color="@color/accent_dim" /><corners android:radius="24dp" /></shape>
     </item>
-</ripple>
+    <item>
+        <shape><solid android:color="@color/accent" /><corners android:radius="24dp" /></shape>
+    </item>
+</selector>

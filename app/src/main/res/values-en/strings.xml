@@ -20,4 +20,7 @@
     <string name="cache">Audio cache (MB, 0 = unlimited)</string>
     <string name="idle">Stop engine after N minutes paused</string>
     <string name="save">Save</string>
+    <string name="pair">Use another device (Spotify Connect)</string>
+    <string name="pair_cancel">Cancel</string>
+    <string name="pair_info">On another phone, tablet or PC on the same Wi-Fi: open Spotify → Devices → pick «%1$s».\nOnly needed once.</string>
 </resources>

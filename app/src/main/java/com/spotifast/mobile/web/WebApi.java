@@ -1,7 +1,5 @@
 package com.spotifast.mobile.web;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
 
 import com.spotifast.mobile.engine.NativeEngine;
@@ -9,16 +7,9 @@ import com.spotifast.mobile.engine.NativeEngine;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Búsqueda y biblioteca vía Spotify Web API. El token lo entrega el motor (sesión de librespot),
@@ -63,8 +54,6 @@ public final class WebApi implements NativeEngine.Listener {
         return instance;
     }
 
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Handler main = new Handler(Looper.getMainLooper());
     private final android.util.SparseArray<TokenCb> pending = new android.util.SparseArray<>();
     private int nextReq = 1;
     private String token;
@@ -118,41 +107,32 @@ public final class WebApi implements NativeEngine.Listener {
                     r.onError(error == null ? "sin token" : error);
                     return;
                 }
-                io.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            HttpURLConnection c = (HttpURLConnection) new URL("https://api.spotify.com" + path).openConnection();
-                            c.setConnectTimeout(15000);
-                            c.setReadTimeout(15000);
-                            c.setRequestProperty("Authorization", "Bearer " + tok);
-                            int status = c.getResponseCode();
-                            String body = read(status < 400 ? c.getInputStream() : c.getErrorStream());
-                            c.disconnect();
-                            if (status == 401) {
-                                token = null;
-                            }
-                            if (status >= 400) {
-                                throw new Exception("Web API " + status);
-                            }
-                            final List<Item> out = new ArrayList<>();
-                            parser.parse(new JSONObject(body), out);
-                            main.post(new Runnable() {
-                                @Override
-                                public void run() {
+                JSONObject headers = new JSONObject();
+                try {
+                    headers.put("Authorization", "Bearer " + tok);
+                } catch (Exception ignored) {
+                }
+                // HTTPS por el motor: mismo comportamiento en Android 4.4 y en 15.
+                NativeEngine.http("GET", "https://api.spotify.com" + path, headers, null,
+                        new NativeEngine.HttpCallback() {
+                            @Override
+                            public void onResponse(int status, byte[] body) {
+                                if (status == 401) {
+                                    token = null;
+                                }
+                                if (status < 200 || status >= 300) {
+                                    r.onError(status == 0 ? "sin conexión" : "Web API " + status);
+                                    return;
+                                }
+                                try {
+                                    List<Item> out = new ArrayList<>();
+                                    parser.parse(new JSONObject(new String(body, "UTF-8")), out);
                                     r.onItems(out);
+                                } catch (Exception e) {
+                                    r.onError("respuesta inválida");
                                 }
-                            });
-                        } catch (final Exception e) {
-                            main.post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    r.onError(e.getMessage() == null ? e.toString() : e.getMessage());
-                                }
-                            });
-                        }
-                    }
-                });
+                            }
+                        });
             }
         });
     }
@@ -235,20 +215,5 @@ public final class WebApi implements NativeEngine.Listener {
 
     private static String optName(JSONObject o) {
         return o == null ? "" : o.optString("name");
-    }
-
-    private static String read(InputStream in) throws Exception {
-        if (in == null) {
-            return "";
-        }
-        BufferedReader r = new BufferedReader(new InputStreamReader(in, "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        char[] buf = new char[8192];
-        int n;
-        while ((n = r.read(buf)) > 0) {
-            sb.append(buf, 0, n);
-        }
-        r.close();
-        return sb.toString();
     }
 }
