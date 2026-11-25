@@ -128,6 +128,14 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 query.setText(q);
                 query.setSelection(q.length());
             }
+
+            @Override
+            public void onDepthChanged(boolean root) {
+                if (atRoot != root) {
+                    atRoot = root;
+                    styleChips();
+                }
+            }
         });
         click(R.id.nav_home, new Runnable() {
             @Override
@@ -566,12 +574,19 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
     }
 
+    private boolean atRoot = true;
+
+    /** Filtros de Inicio/Biblioteca: solo en la raíz de la pestaña, no dentro de una playlist o la cola. */
+    private void styleChips() {
+        chips.setVisibility(tab == TAB_LIBRARY && atRoot ? View.VISIBLE : View.GONE);
+        homeChips.setVisibility(tab == TAB_HOME && atRoot ? View.VISIBLE : View.GONE);
+    }
+
     /** Solo el aspecto de la barra inferior y los controles de cada pestaña. */
     void styleTab(int t) {
         tab = t;
         searchBar.setVisibility(t == TAB_SEARCH ? View.VISIBLE : View.GONE);
-        chips.setVisibility(t == TAB_LIBRARY ? View.VISIBLE : View.GONE);
-        homeChips.setVisibility(t == TAB_HOME ? View.VISIBLE : View.GONE);
+        styleChips();
         // "Baño" de color tenue arriba del Inicio (un gradiente: no cuesta nada dibujarlo).
         findViewById(R.id.main_column).setBackgroundResource(t == TAB_HOME ? R.drawable.home_wash : 0);
         if (t != TAB_SEARCH) {

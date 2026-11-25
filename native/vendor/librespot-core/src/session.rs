@@ -584,6 +584,16 @@ impl Session {
     }
 
     pub fn autoplay(&self) -> bool {
+        // TINYL PATCH: ver config::AUTOPLAY_OVERRIDE.
+        use std::sync::atomic::Ordering::Relaxed;
+        if crate::config::RADIO.load(Relaxed) {
+            return true;
+        }
+        match crate::config::AUTOPLAY_OVERRIDE.load(Relaxed) {
+            1 => return false,
+            2 => return true,
+            _ => {}
+        }
         if let Some(overide) = self.config().autoplay {
             return overide;
         }

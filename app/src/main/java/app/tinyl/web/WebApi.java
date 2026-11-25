@@ -40,6 +40,8 @@ public final class WebApi implements NativeEngine.Listener {
         public boolean fullyPlayed;
         /** Mostrar como tarjeta grande (artistas del momento, podcasts) en vez de fila. */
         public boolean card;
+        /** Posición en la cola (0 = la próxima); -2 = la que suena; -1 = no es de la cola. */
+        public int queuePos = -1;
 
         Item(String uri, String title, String subtitle, String kind) {
             this.uri = uri;
@@ -235,6 +237,7 @@ public final class WebApi implements NativeEngine.Listener {
             public String parse(JSONObject o, List<Item> out) {
                 Item now = item(o.optJSONObject("currently_playing"), "track");
                 if (now != null) {
+                    now.queuePos = -2;
                     out.add(Item.header("Sonando"));
                     out.add(now);
                 }
@@ -245,6 +248,7 @@ public final class WebApi implements NativeEngine.Listener {
                 for (int i = 0; q != null && i < q.length(); i++) {
                     Item it = item(q.optJSONObject(i), "track");
                     if (it != null) {
+                        it.queuePos = i;
                         out.add(it);
                     }
                 }

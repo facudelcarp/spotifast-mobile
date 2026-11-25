@@ -31,7 +31,7 @@ alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PU
 1. **Navegador** (normal): OAuth PKCE con un servidor local en `127.0.0.1:8898`.
 2. **Otro dispositivo (Spotify Connect)**: para teléfonos cuyo navegador no puede abrir la página de Spotify. El teléfono se anuncia en la Wi-Fi (mDNS). En cualquier otra app de Spotify de la misma red se elige «Tinyl …» una sola vez, y esa app le pasa la sesión. Es el mismo mecanismo con el que se empareja Soloist.
 
-librespot está parcheado (`native/vendor/librespot-core`, ver "TINYL PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
+librespot está parcheado (`native/vendor/librespot-core`, ver "TINYL PATCH") para identificarse como escritorio Linux y para poder prender o apagar la reproducción automática sin reiniciar la sesión. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
 
 ## Funciones
 
@@ -48,6 +48,7 @@ Inspirada en la app oficial, pero pensada para gama baja (un solo ListView por p
 - **Podcasts**: tus podcasts y episodios, "Seguir escuchando" y retomar donde quedaste; también en la búsqueda.
 - **Precargar** una playlist, álbum o Tus me gusta con Wi-Fi: el audio queda en la caché (cifrado, como al escucharlo) y después casi no gasta datos. Sigue necesitando conexión para la clave de cada canción: no es modo sin conexión ni evita la protección de Spotify.
 - **Crear playlist** y **Agregar a una playlist** desde el menú de cualquier canción (mantener apretado).
+- **Cola y reproducción automática**: al terminar lo que elegiste, sigue con canciones similares (el autoplay de Spotify, resuelto por el motor). **Iniciar radio** desde cualquier canción. En la Cola, tocar una canción salta hasta ella.
 - **Mini reproductor** flotante teñido con el color de la carátula (calculado de la miniatura de 64 px), con ♥ y play.
 - **Sonando**: carátula, display LCD retro, controles, volumen y acceso a la **Cola**.
 - Listas paginadas a demanda: ningún pedido que no hayas pedido vos.
@@ -73,7 +74,7 @@ Ante un 429 se respeta `Retry-After` y no se reintenta.
 │   ▼                                │                │
 │ NativeEngine (JNI) ───────────────►┘                │
 │   │                                                 │
-│   ▼  libspotifast.so (Rust)                         │
+│   ▼  libtinyl.so (Rust)                         │
 │   librespot: sesión, Connect (Spirc), decodificación│
 │   │ PCM s16 44.1 kHz                                │
 │   ▼                                                 │
@@ -95,7 +96,7 @@ Ante un 429 se respeta `Retry-After` y no se reintenta.
 
 - **Sin polling.** La UI se actualiza con eventos. El reloj se calcula en el teléfono y solo avanza mientras la pantalla está visible.
 - **96 kbps por defecto**: menos datos y menos CPU al decodificar. Se puede cambiar a 160 o 320.
-- **Caché de audio (200 MB)**: escuchar de nuevo una canción no gasta datos.
+- **Caché de audio (512 MB)**: escuchar de nuevo una canción no gasta datos.
 - **Buffer de audio de ~0,5 s** y conversión sin dither: el procesador se despierta menos.
 - **Locks solo mientras suena.** El wakelock y el wifilock se sueltan al pausar. Tras 10 minutos en pausa con la app cerrada, el motor se apaga.
 - **Modo ahorro activado por defecto**: sin carátulas. Tema **negro puro**, que gasta menos en pantallas OLED.
@@ -165,7 +166,7 @@ El Release queda con un APK por procesador, el universal y `SHA256SUMS.txt`. La 
 - Probado en un emulador; falta validarlo en más teléfonos reales, sobre todo con Android 4.4.
 - librespot no es oficial. Spotify cambió su protocolo varias veces y a veces lo rompe temporalmente.
 - Sin app propia, la búsqueda depende del client ID compartido y Spotify la limita (429). Ver "Búsqueda y biblioteca".
-- "Agregar a la cola" todavía no está implementado: el motor no lo expone.
+- "Agregar a la cola" usa la Web API (librespot no lo expone): siempre agrega al final, no hay "reproducir a continuación" ni quitar de la cola.
 - Sin modo sin conexión (como Spotifast): la precarga ahorra datos pero sigue necesitando señal.
 
 ## Nombre y marca

@@ -1,3 +1,9 @@
+// TINYL PATCH: reproducción automática (canciones similares al terminar) controlable en
+// caliente desde la app. 0 = lo que diga la cuenta, 1 = apagada, 2 = encendida.
+// RADIO fuerza el autoplay mientras suena una "radio" iniciada a pedido.
+pub static AUTOPLAY_OVERRIDE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+pub static RADIO: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 use std::{fmt, path::PathBuf, str::FromStr};
 
 use librespot_protocol::devices::DeviceType as ProtoDeviceType;

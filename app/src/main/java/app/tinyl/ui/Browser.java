@@ -45,6 +45,8 @@ final class Browser {
         boolean grid;
         /** Filas fijas al principio (no cuentan como "ya cargado"). */
         int fixed;
+        /** Pantalla de Cola: se recarga sola cuando cambia la canción. */
+        boolean queue;
         /** Qué decir si la pantalla queda vacía (nunca una pantalla en blanco). */
         String emptyText = "Nada por acá";
 
@@ -66,6 +68,8 @@ final class Browser {
     private static final String PAIR = "pair";
     private static final String PREFETCH = "prefetch";
     private static final String CARDS = "cards";
+    private static final String AUTOPLAY = "autoplay";
+    private static final String RADIO = "radio";
 
     private final Activity activity;
     private final ListView list;
@@ -286,14 +290,80 @@ final class Browser {
         root(p);
     }
 
-    /** Cola, abierta desde "Sonando". */
+    /** Cola, abierta desde "Sonando": autoplay, radio y lo que sigue (tocar = saltar ahí). */
     void showQueue() {
-        push(new Page("Cola", null, new Loader() {
+        if (!stack.isEmpty() && top().queue) {
+            reloadQueue.run();
+            return;
+        }
+        Page p = new Page("Cola", null, new Loader() {
             @Override
             public void load(WebApi api, WebApi.Result r) {
                 api.queue(r);
             }
-        }));
+        });
+        p.queue = true;
+        p.emptyText = "La cola está vacía";
+        queueRows(p);
+        push(p);
+    }
+
+    /** Filas fijas de la Cola: interruptor de reproducción automática y radio. */
+    private void queueRows(Page p) {
+        if (p.loader == null) { // demo: conservar las filas de la cola, rehacer solo las fijas
+            List<WebApi.Item> rest = new ArrayList<>(p.items.subList(Math.min(p.fixed, p.items.size()), p.items.size()));
+            p.items.clear();
+            addQueueRows(p);
+            p.items.addAll(rest);
+            return;
+        }
+        p.items.clear();
+        addQueueRows(p);
+    }
+
+    private void addQueueRows(Page p) {
+        boolean on = prefs.autoplay();
+        p.items.add(WebApi.Item.make("", "Reproducción automática", on
+                ? "Activada · después siguen similares"
+                : "Desactivada · se detiene al terminar", AUTOPLAY));
+        EngineState s = EngineState.get();
+        if (s.uri.startsWith("spotify:track:")) {
+            p.items.add(WebApi.Item.make(s.uri, "Iniciar radio",
+                    "Canciones similares a «" + s.title + "»", RADIO));
+        }
+        p.fixed = p.items.size();
+        p.next = null;
+    }
+
+    /** Recarga la Cola (con demora: al saltar varias canciones llegan varios cambios seguidos). */
+    private final Runnable reloadQueue = new Runnable() {
+        @Override
+        public void run() {
+            if (stack.isEmpty() || !top().queue) {
+                return;
+            }
+            Page p = top();
+            if (p.loader == null) {
+                return; // modo demo
+            }
+            queueRows(p);
+            load(p);
+            render();
+        }
+    };
+
+    /** Cola con filas ya armadas (modo demo). */
+    void showQueueStatic(List<WebApi.Item> items) {
+        Page p = new Page("Cola", null, null);
+        p.queue = true;
+        queueRows(p);
+        p.items.addAll(items);
+        push(p);
+    }
+
+    private void reloadQueueSoon() {
+        list.removeCallbacks(reloadQueue);
+        list.postDelayed(reloadQueue, 900);
     }
 
     /** Pantalla con filas ya armadas (modo demo para capturas). */
@@ -512,9 +582,27 @@ final class Browser {
             case PREFETCH:
                 prefetch(p);
                 return;
+            case AUTOPLAY:
+                prefs.setAutoplay(!prefs.autoplay());
+                queueRows(p);
+                if (p.loader != null) {
+                    load(p); // al prenderla, Spotify suma similares a la cola
+                }
+                render();
+                return;
+            case RADIO:
+                startRadio(it.uri);
+                return;
             case "header":
                 return;
             default:
+        }
+        if (p.queue && it.queuePos != -1) {
+            if (it.queuePos >= 0) { // saltar hasta esa canción sin perder el resto de la cola
+                NativeEngine.command("skip_next", "count", it.queuePos + 1);
+                reloadQueueSoon();
+            }
+            return;
         }
         if ("episode".equals(it.kind)) {
             // Podcasts: retomar donde quedaste (salvo que ya lo hayas terminado).
@@ -537,7 +625,7 @@ final class Browser {
 
     private boolean onLongClick(final WebApi.Item it) {
         if (it.isHeader() || NAV.equals(it.kind) || MORE.equals(it.kind) || LIKED.equals(it.kind)
-                || PREFETCH.equals(it.kind)
+                || PREFETCH.equals(it.kind) || AUTOPLAY.equals(it.kind) || RADIO.equals(it.kind)
                 || QUERY.equals(it.kind) || CLEAR_HISTORY.equals(it.kind)
                 || PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind)) {
             return false;
@@ -558,6 +646,15 @@ final class Browser {
                 @Override
                 public void run() {
                     play(it.uri, null);
+                }
+            });
+        }
+        if ("track".equals(it.kind)) {
+            labels.add("Iniciar radio");
+            actions.add(new Runnable() {
+                @Override
+                public void run() {
+                    startRadio(it.uri);
                 }
             });
         }
@@ -713,6 +810,9 @@ final class Browser {
     /** Avisos hacia MainActivity (rellenar el buscador al tocar una búsqueda reciente). */
     interface Listener {
         void onSearchAgain(String query);
+
+        /** Raíz de la pestaña o pantalla interna (playlist, álbum, cola): los filtros van solo en la raíz. */
+        void onDepthChanged(boolean atRoot);
     }
 
     private Listener listener;
@@ -752,6 +852,14 @@ final class Browser {
         };
     }
 
+    /** Radio: esa canción y después similares (autoplay de Spotify), aunque esté apagado. */
+    private void startRadio(String trackUri) {
+        EngineState.get().contextUri = trackUri;
+        NativeEngine.command("radio", "uri", trackUri);
+        Toast.makeText(activity, "Radio: después siguen canciones similares", Toast.LENGTH_SHORT).show();
+        reloadQueueSoon();
+    }
+
     private static void play(String uri, String offsetUri) {
         if (uri == null) {
             return;
@@ -776,6 +884,9 @@ final class Browser {
         back.setVisibility(stack.size() > 1 ? View.VISIBLE : View.GONE);
         if (avatar != null) {
             avatar.setVisibility(stack.size() > 1 ? View.GONE : View.VISIBLE);
+        }
+        if (listener != null) {
+            listener.onDepthChanged(stack.size() <= 1);
         }
         List<WebApi.Item> rows = new ArrayList<>();
         boolean hasPlayable = false;
@@ -922,7 +1033,8 @@ final class Browser {
             android.widget.ImageView icon = (android.widget.ImageView) v.findViewById(android.R.id.icon);
             t1.setText(it.title);
             boolean special = PLAY_ALL.equals(it.kind) || SHUFFLE_ALL.equals(it.kind) || MORE.equals(it.kind)
-                    || PREFETCH.equals(it.kind)
+                    || PREFETCH.equals(it.kind) || RADIO.equals(it.kind)
+                    || (AUTOPLAY.equals(it.kind) && prefs.autoplay())
                     || CLEAR_HISTORY.equals(it.kind);
             boolean current = it.uri.length() > 0 && it.uri.equals(EngineState.get().uri);
             t1.setTextColor(activity.getResources().getColor(
@@ -1054,6 +1166,16 @@ final class Browser {
                     res = R.drawable.ic_download;
                     tint = R.color.accent;
                     break;
+                case AUTOPLAY:
+                    pad = dp(13);
+                    res = R.drawable.ic_repeat;
+                    tint = prefs.autoplay() ? R.color.accent : R.color.muted;
+                    break;
+                case RADIO:
+                    pad = dp(13);
+                    res = R.drawable.ic_radio;
+                    tint = R.color.accent;
+                    break;
                 case MORE:
                     icon.setVisibility(View.GONE);
                     return;
@@ -1095,5 +1217,8 @@ final class Browser {
 
     void refreshHighlight() {
         adapter.notifyDataSetChanged();
+        if (!stack.isEmpty() && top().queue) {
+            reloadQueueSoon(); // cambió la canción: la cola avanzó
+        }
     }
 }

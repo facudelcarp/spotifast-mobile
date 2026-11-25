@@ -148,6 +148,7 @@ public final class PlayerService extends Service implements EngineState.Observer
     public void onCreate() {
         super.onCreate();
         prefs = new Prefs(this);
+        NativeEngine.command("set_autoplay", "enabled", prefs.autoplay());
         am = (AudioManager) getSystemService(AUDIO_SERVICE);
         NativeEngine.setAudioOut(audio);
 

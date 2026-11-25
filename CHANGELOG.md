@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.7.0
+
+**Cola y reproducción automática**
+- **Reproducción automática** (activada por defecto): al terminar la canción, el álbum o la playlist,
+  sigue con canciones similares, como en la app oficial. Es el autoplay de Spotify (lo resuelve el
+  motor directo con Spotify, sin pedidos extra a la Web API). Se apaga en Ajustes o desde la Cola.
+- Una canción suelta (búsqueda, enlace compartido) ahora se reproduce como en la app oficial: al
+  terminar sigue con similares en vez de detenerse.
+- **Iniciar radio** desde el menú de cualquier canción (mantener apretado) o desde la Cola: esa
+  canción y después similares, aunque la reproducción automática esté apagada.
+- **Cola renovada**: interruptor de reproducción automática, tocar una canción salta directo a ella
+  sin perder el resto, y se actualiza sola al cambiar de tema mientras está abierta.
+
 ## v0.6.0
 
 Primera versión publicada, como **Tinyl · cliente liviano para Spotify** (antes "Spotifast Mobile").

@@ -47,6 +47,7 @@
     <string name="chip_playlists">Playlists</string>
     <string name="chip_albums">Álbumes</string>
     <string name="chip_artists">Artistas</string>
+    <string name="autoplay">Reproducción automática (al terminar, seguir con canciones similares)</string>
     <string name="prefetch_wifi_only">Precargar solo con Wi-Fi</string>
     <string name="cache_clear">Vaciar caché de audio</string>
     <string name="cache_use">En caché: %1$d MB (canciones escuchadas y precargadas)</string>

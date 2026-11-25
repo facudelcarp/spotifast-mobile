@@ -17,6 +17,7 @@ mod prefetch;
 mod sink;
 
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,7 +31,7 @@ use librespot_connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingT
 use librespot_core::{
     authentication::Credentials,
     cache::Cache,
-    config::{DeviceType, SessionConfig},
+    config::{DeviceType, SessionConfig, AUTOPLAY_OVERRIDE, RADIO},
     session::Session,
     Error,
 };
@@ -470,6 +471,12 @@ fn handle_command(text: &str) {
             }
             return emit(playback_state_json(&e));
         }
+        // Reproducción automática: vale antes de iniciar sesión (la app la fija al arrancar).
+        "set_autoplay" => {
+            let on = cmd.get("enabled").and_then(Value::as_bool).unwrap_or(true);
+            AUTOPLAY_OVERRIDE.store(if on { 2 } else { 1 }, Ordering::Relaxed);
+            return emit(json!({"type": "command_result", "command": name}));
+        }
         _ => {}
     }
 
@@ -484,8 +491,23 @@ fn handle_command(text: &str) {
     let result: Result<(), String> = (|| {
         let map = |r: Result<(), Error>| r.map_err(|e| e.to_string());
         match name.as_str() {
+            // Extensión: "radio" arranca con esa canción y sigue con similares (autoplay de
+            // Spotify), aunque la reproducción automática esté apagada.
+            "radio" => {
+                let uri = cmd.get("uri").and_then(Value::as_str).unwrap_or("");
+                if !uri.starts_with("spotify:track:") {
+                    return Err("radio: hace falta una canción".into());
+                }
+                if !active {
+                    map(spirc.activate())?;
+                }
+                RADIO.store(true, Ordering::Relaxed);
+                let opts = LoadRequestOptions { start_playing: true, ..Default::default() };
+                map(spirc.load(LoadRequest::from_context_uri(uri.to_string(), opts)))
+            }
             "play" => match cmd.get("uri").and_then(Value::as_str) {
                 Some(uri) if !uri.is_empty() => {
+                    RADIO.store(false, Ordering::Relaxed);
                     if !active {
                         map(spirc.activate())?;
                     }
@@ -509,7 +531,10 @@ fn handle_command(text: &str) {
                         seek_to,
                         ..Default::default()
                     };
-                    let req = if uri.starts_with("spotify:track:") || uri.starts_with("spotify:episode:") {
+                    // Una canción suelta se carga como contexto "spotify:track:…" (como la app
+                    // oficial): así, al terminar, el autoplay sigue con canciones similares.
+                    // Con from_tracks el contexto sería "spotify:web-api" y no habría autoplay.
+                    let req = if uri.starts_with("spotify:episode:") {
                         LoadRequest::from_tracks(vec![uri.to_string()], opts)
                     } else {
                         LoadRequest::from_context_uri(uri.to_string(), opts)
@@ -524,7 +549,14 @@ fn handle_command(text: &str) {
                 }
             },
             "pause" => map(spirc.pause()),
-            "skip_next" => map(spirc.next()),
+            // "count": saltar varias (tocar una canción más abajo en la cola).
+            "skip_next" => {
+                let n = cmd.get("count").and_then(Value::as_u64).unwrap_or(1).clamp(1, 50);
+                for _ in 0..n {
+                    map(spirc.next())?;
+                }
+                Ok(())
+            }
             "skip_prev" => map(spirc.prev()),
             "seek" => map(spirc.set_position_ms(field_u64(&cmd, "position_ms")? as u32)),
             "set_volume" => {

@@ -51,6 +51,16 @@ public final class Prefs {
         p.edit().putBoolean("eco", v).apply();
     }
 
+    /** Reproducción automática: al terminar lo que elegiste, sigue con canciones similares. */
+    public boolean autoplay() {
+        return p.getBoolean("autoplay", true);
+    }
+
+    public void setAutoplay(boolean v) {
+        p.edit().putBoolean("autoplay", v).apply();
+        app.tinyl.engine.NativeEngine.command("set_autoplay", "enabled", v);
+    }
+
     /** Caché de audio: repetir canciones no gasta datos. */
     public int cacheMb() {
         // 512 MB: alcanza para unas 25 h de audio a 96 kbps (precargas incluidas).

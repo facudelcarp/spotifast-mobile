@@ -57,7 +57,22 @@ final class Demo {
         for (int i = 0; i < t.length; i++) {
             tracks.add(it(i == 0 ? "spotify:track:demo1" : "spotify:track:x" + i, t[i][0], t[i][1], "track"));
         }
-        if ("search".equals(mode)) {
+        if ("queue".equals(mode)) {
+            a.demoTab(MainActivity.DEMO_HOME);
+            browser.showStatic(Browser.greeting(), null, new ArrayList<WebApi.Item>(), true);
+            List<WebApi.Item> q = new ArrayList<>();
+            q.add(WebApi.Item.header("Sonando"));
+            WebApi.Item now = it("spotify:track:demo1", "A Toda Hora", "Los Demo · Vol. 3", "track");
+            now.queuePos = -2;
+            q.add(now);
+            q.add(WebApi.Item.header("A continuación"));
+            for (int i = 1; i < t.length; i++) {
+                WebApi.Item x = it("spotify:track:x" + i, t[i][0], t[i][1], "track");
+                x.queuePos = i - 1;
+                q.add(x);
+            }
+            browser.showQueueStatic(q);
+        } else if ("search".equals(mode)) {
             Prefs p = new Prefs(a);
             p.clearSearches();
             for (String q : new String[]{"tame impala", "cero", "ysy a", "lil peep"}) {
