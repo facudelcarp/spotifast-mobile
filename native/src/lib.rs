@@ -534,7 +534,16 @@ fn request_token(scopes: String, req_id: i32) {
         return emit(json!({"type": "token", "req_id": req_id, "error": "sin sesión"}));
     };
     runtime().spawn(async move {
-        match session.token_provider().get_token(&scopes).await {
+        // keymaster (token_provider) fue dado de baja por Spotify (403 "Invalid request").
+        // login5 es el mecanismo actual; keymaster queda como último recurso.
+        let result = match session.login5().auth_token().await {
+            Ok(t) => Ok(t),
+            Err(e) => {
+                warn!("login5: {e}; probando keymaster");
+                session.token_provider().get_token(&scopes).await
+            }
+        };
+        match result {
             Ok(t) => emit(json!({
                 "type": "token",
                 "req_id": req_id,
