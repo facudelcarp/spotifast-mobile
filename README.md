@@ -117,6 +117,43 @@ cargo install cargo-ndk
 Los APK quedan en `app/build/outputs/apk/release/`. El CI (`.github/workflows/android.yml`) los publica como artefacto en cada push.
 El APK de release se firma con la clave de debug para poder instalarlo directo. **Antes de distribuirlo, configurá tu propio keystore.**
 
+## Release
+
+Cada tag `v*` compila los APKs firmados y crea un Release en GitHub (`.github/workflows/release.yml`).
+
+### 1. Crear tu keystore (una sola vez, en tu PC)
+
+**Guardalo bien.** Si lo perdés, las versiones nuevas ya no se pueden instalar encima de las viejas.
+
+En PowerShell (`keytool` viene con Android Studio, en `C:\Program Files\Android\Android Studio\jbr\bin`):
+
+```powershell
+keytool -genkeypair -keystore spotifast.jks -alias spotifast -keyalg RSA -keysize 2048 -validity 10000
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("spotifast.jks")) | Set-Clipboard
+```
+
+### 2. Cargar los secrets en GitHub
+
+Repo → Settings → Secrets and variables → Actions → **New repository secret**:
+
+| Secret | Valor |
+|---|---|
+| `SPOTIFAST_KEYSTORE_BASE64` | El texto que quedó en el portapapeles |
+| `SPOTIFAST_KEYSTORE_PASSWORD` | La contraseña del keystore |
+| `SPOTIFAST_KEY_ALIAS` | `spotifast` |
+| `SPOTIFAST_KEY_PASSWORD` | La contraseña de la clave (si es la misma, repetila) |
+
+### 3. Publicar
+
+```bash
+git tag v0.6.0
+git push origin v0.6.0
+```
+
+O desde GitHub: Actions → **Release** → Run workflow → versión `0.6.0`.
+
+El Release queda con un APK por procesador, el universal y `SHA256SUMS.txt`. La versión sale del tag (`v0.6.0` → versionCode 600).
+
 ## Limitaciones conocidas (honestas)
 
 - Probado en un emulador; falta validarlo en más teléfonos reales, sobre todo con Android 4.4.
