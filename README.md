@@ -32,6 +32,16 @@ alcanza con cambiar `NativeEngine` por un cliente WebSocket a `ws://127.0.0.1:PU
 
 librespot está parcheado (`native/vendor/librespot-core`, ver "SPOTIFAST PATCH") para identificarse como escritorio Linux. En modo "android" imita a la app oficial y Spotify rechaza el login (`Login request was denied: BAD_REQUEST`).
 
+## Funciones
+
+- **Biblioteca**: Tus me gusta, Playlists, Álbumes, Artistas y Escuchado recientemente.
+- **Pantallas de playlist, álbum y artista** (populares + discografía), con Reproducir y Aleatorio. Al tocar una canción, el contexto arranca desde ahí.
+- **Búsqueda** por canciones, artistas, álbumes y playlists, o pegando/compartiendo un enlace.
+- **Cola**: verla y agregar canciones (mantener apretado → Agregar a la cola).
+- **♥ Me gusta** en la canción actual y desde el menú de cualquier fila.
+- Tocar el título abre el álbum y el artista abre la página del artista.
+- Listas paginadas a demanda ("Cargar más"): ningún pedido que no hayas pedido vos.
+
 ## Búsqueda y biblioteca (Web API)
 
 Igual que Spotifast, la Web API usa **tu propia app de Spotify**. Con el client ID compartido, Spotify corta con `429 Too Many Requests`.

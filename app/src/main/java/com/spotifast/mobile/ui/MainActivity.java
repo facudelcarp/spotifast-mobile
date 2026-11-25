@@ -8,11 +8,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.AdapterView;
-import android.widget.BaseAdapter;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -48,10 +45,16 @@ public final class MainActivity extends Activity implements EngineState.Observer
     private SeekBar seek, volume;
     private View loginPanel;
     private android.widget.EditText query;
-    private final Adapter adapter = new Adapter();
+    private Browser browser;
+    private ImageButton like;
+    private TextView tabLibrary, tabSearch, tabQueue;
+    /** Estado de Me gusta de la pista actual (null = desconocido). */
+    private Boolean liked;
+    private String likedUri;
     private boolean userSeeking;
     private String pendingUri;
     private String shownCover;
+    private String shownUri;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -87,12 +90,53 @@ public final class MainActivity extends Activity implements EngineState.Observer
         pairButton = (android.widget.Button) findViewById(R.id.btn_pair);
         query = (android.widget.EditText) findViewById(R.id.query);
 
-        ListView list = (ListView) findViewById(R.id.list);
-        list.setAdapter(adapter);
-        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        browser = new Browser(this, (ListView) findViewById(R.id.list), empty,
+                (TextView) findViewById(R.id.page_title), findViewById(R.id.page_back));
+        like = (ImageButton) findViewById(R.id.btn_like);
+        tabLibrary = (TextView) findViewById(R.id.tab_library);
+        tabSearch = (TextView) findViewById(R.id.tab_search);
+        tabQueue = (TextView) findViewById(R.id.tab_queue);
+        click(R.id.tab_library, new Runnable() {
             @Override
-            public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                playUri(adapter.items.get(pos).uri);
+            public void run() {
+                showLibrary();
+            }
+        });
+        click(R.id.tab_search, new Runnable() {
+            @Override
+            public void run() {
+                selectTab(tabSearch);
+                query.requestFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                imm.showSoftInput(query, 0);
+            }
+        });
+        click(R.id.tab_queue, new Runnable() {
+            @Override
+            public void run() {
+                if (EngineState.get().loggedIn) {
+                    selectTab(tabQueue);
+                    browser.showQueue();
+                }
+            }
+        });
+        click(R.id.btn_like, new Runnable() {
+            @Override
+            public void run() {
+                toggleLike();
+            }
+        });
+        // Tocar el título abre el álbum; el artista/álbum de abajo, el artista.
+        click(R.id.title, new Runnable() {
+            @Override
+            public void run() {
+                browser.openNowPlaying(false);
+            }
+        });
+        click(R.id.subtitle, new Runnable() {
+            @Override
+            public void run() {
+                browser.openNowPlaying(true);
             }
         });
 
@@ -213,7 +257,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         EngineState s = EngineState.get();
         s.addObserver(this);
         ensureEngine();
-        render(s);
+        onStateChanged(s);
     }
 
     @Override
@@ -308,39 +352,92 @@ public final class MainActivity extends Activity implements EngineState.Observer
         if (!EngineState.get().loggedIn) {
             return;
         }
-        empty.setText("Buscando…");
-        adapter.set(new ArrayList<WebApi.Item>());
-        WebApi.get(this).search(q, results());
+        selectTab(tabSearch);
+        browser.showSearch(q);
     }
 
     private void showLibrary() {
         if (!EngineState.get().loggedIn) {
             return;
         }
-        empty.setText("Cargando biblioteca…");
-        adapter.set(new ArrayList<WebApi.Item>());
-        WebApi.get(this).myPlaylists(EngineState.get().username, results());
+        selectTab(tabLibrary);
+        browser.showLibrary();
     }
 
-    private WebApi.Result results() {
-        return new WebApi.Result() {
-            @Override
-            public void onItems(List<WebApi.Item> items) {
-                adapter.set(items);
-                empty.setText(items.isEmpty() ? "Sin resultados" : "");
-            }
+    private void selectTab(TextView tab) {
+        for (TextView t : new TextView[]{tabLibrary, tabSearch, tabQueue}) {
+            t.setTextColor(getResources().getColor(t == tab ? R.color.accent : R.color.muted));
+        }
+    }
 
+    @Override
+    public void onBackPressed() {
+        if (!browser.back()) {
+            super.onBackPressed();
+        }
+    }
+
+    // ------------------------------------------------------------------ Me gusta
+
+    private void toggleLike() {
+        final String uri = EngineState.get().uri;
+        if (uri.length() == 0 || liked == null) {
+            return;
+        }
+        final boolean target = !liked;
+        liked = target; // optimista: se corrige si falla
+        renderLike();
+        WebApi.get(this).save(uri, target, new WebApi.Done() {
             @Override
-            public void onError(String message) {
-                empty.setText("Error: " + message);
+            public void onDone(boolean ok, String message) {
+                if (!ok && uri.equals(likedUri)) {
+                    liked = !target;
+                    renderLike();
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
             }
-        };
+        });
+    }
+
+    /** Un solo pedido por canción, y solo con la app a la vista. */
+    private void refreshLike(EngineState s) {
+        if (!s.loggedIn || s.uri.length() == 0 || s.uri.equals(likedUri)) {
+            return;
+        }
+        final String uri = s.uri;
+        likedUri = uri;
+        liked = null;
+        renderLike();
+        WebApi.get(this).contains(uri, new WebApi.Flags() {
+            @Override
+            public void onFlags(boolean[] v) {
+                if (uri.equals(likedUri) && v.length > 0) {
+                    liked = v[0];
+                    renderLike();
+                }
+            }
+        });
+    }
+
+    private void renderLike() {
+        like.setVisibility(liked == null ? View.INVISIBLE : View.VISIBLE);
+        boolean on = Boolean.TRUE.equals(liked);
+        like.setImageResource(on ? R.drawable.ic_heart : R.drawable.ic_heart_outline);
+        like.setColorFilter(getResources().getColor(on ? R.color.accent : R.color.muted));
     }
 
     // ------------------------------------------------------------------ render
 
     @Override
     public void onStateChanged(EngineState s) {
+        if (s.loggedIn && browser.isEmpty()) {
+            showLibrary(); // pantalla inicial al conectar
+        }
+        if (!s.uri.equals(shownUri)) {
+            shownUri = s.uri;
+            browser.refreshHighlight();
+        }
+        refreshLike(s);
         if (s.loggedIn && pendingUri != null) {
             NativeEngine.command("play", "uri", pendingUri);
             pendingUri = null;
@@ -439,41 +536,5 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 NativeEngine.command(name);
             }
         };
-    }
-
-    private final class Adapter extends BaseAdapter {
-        final List<WebApi.Item> items = new ArrayList<>();
-
-        void set(List<WebApi.Item> list) {
-            items.clear();
-            items.addAll(list);
-            notifyDataSetChanged();
-        }
-
-        @Override
-        public int getCount() {
-            return items.size();
-        }
-
-        @Override
-        public Object getItem(int i) {
-            return items.get(i);
-        }
-
-        @Override
-        public long getItemId(int i) {
-            return i;
-        }
-
-        @Override
-        public View getView(int i, View v, ViewGroup parent) {
-            if (v == null) {
-                v = getLayoutInflater().inflate(R.layout.item_result, parent, false);
-            }
-            WebApi.Item it = items.get(i);
-            ((TextView) v.findViewById(android.R.id.text1)).setText(it.title);
-            ((TextView) v.findViewById(android.R.id.text2)).setText(it.subtitle);
-            return v;
-        }
     }
 }
