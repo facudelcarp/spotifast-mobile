@@ -34,13 +34,17 @@ librespot está parcheado (`native/vendor/librespot-core`, ver "SPOTIFAST PATCH"
 
 ## Funciones
 
-- **Biblioteca**: Tus me gusta, Playlists, Álbumes, Artistas y Escuchado recientemente.
-- **Pantallas de playlist, álbum y artista** (populares + discografía), con Reproducir y Aleatorio. Al tocar una canción, el contexto arranca desde ahí.
-- **Búsqueda** por canciones, artistas, álbumes y playlists, o pegando/compartiendo un enlace.
-- **Cola**: verla y agregar canciones (mantener apretado → Agregar a la cola).
-- **♥ Me gusta** en la canción actual y desde el menú de cualquier fila.
-- Tocar el título abre el álbum y el artista abre la página del artista.
-- Listas paginadas a demanda ("Cargar más"): ningún pedido que no hayas pedido vos.
+Inspirada en la app oficial, pero pensada para gama baja (un solo ListView por pantalla, sin carruseles ni GridView anidados):
+
+- **Barra inferior**: Inicio · Buscar · Tu biblioteca · Crear.
+- **Inicio**: saludo + grilla de accesos a lo último que escuchaste (de tu historial) + canciones recientes.
+- **Buscar**: búsquedas recientes guardadas en el teléfono (cero red) y resultados por Canciones, Artistas, Álbumes y Playlists. También acepta enlaces de Spotify, pegados o compartidos.
+- **Tu biblioteca** con filtros Playlists / Álbumes / Artistas y "Tus me gusta" arriba.
+- **Playlist, álbum y artista** con Reproducir y Aleatorio. Al tocar una canción, el contexto arranca desde ahí.
+- **Crear playlist** y **Agregar a una playlist** desde el menú de cualquier canción (mantener apretado).
+- **Mini reproductor** flotante teñido con el color de la carátula (calculado de la miniatura de 64 px), con ♥ y play.
+- **Sonando**: carátula, display LCD retro, controles, volumen y acceso a la **Cola**.
+- Listas paginadas a demanda: ningún pedido que no hayas pedido vos.
 
 ## Búsqueda y biblioteca (Web API)
 

@@ -31,6 +31,35 @@ public final class CoverLoader {
     private CoverLoader() {
     }
 
+    /**
+     * Tono de fondo para el mini reproductor: promedio de la miniatura (64 px, 64 muestras),
+     * oscurecido para que el texto blanco siempre se lea. Cuesta microsegundos.
+     */
+    public static int tone(Bitmap b) {
+        int w = b.getWidth(), h = b.getHeight();
+        long r = 0, g = 0, bl = 0;
+        int n = 0;
+        for (int y = h / 16; y < h; y += Math.max(1, h / 8)) {
+            for (int x = w / 16; x < w; x += Math.max(1, w / 8)) {
+                int c = b.getPixel(x, y);
+                r += (c >> 16) & 0xff;
+                g += (c >> 8) & 0xff;
+                bl += c & 0xff;
+                n++;
+            }
+        }
+        if (n == 0) {
+            return 0;
+        }
+        // Oscurecer al ~45% y saturar un poco hacia el color dominante.
+        int rr = (int) (r / n), gg = (int) (g / n), bb = (int) (bl / n);
+        float[] hsv = new float[3];
+        android.graphics.Color.RGBToHSV(rr, gg, bb, hsv);
+        hsv[1] = Math.min(1f, hsv[1] * 1.25f);
+        hsv[2] = Math.min(0.42f, Math.max(0.22f, hsv[2] * 0.55f));
+        return android.graphics.Color.HSVToColor(hsv);
+    }
+
     public static Bitmap cached(String url) {
         return url == null ? null : CACHE.get(url);
     }

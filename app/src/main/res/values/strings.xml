@@ -11,7 +11,7 @@
     <string name="repeat">Repetir</string>
     <string name="library">Biblioteca</string>
     <string name="search">Buscar</string>
-    <string name="search_hint">Buscar o pegar enlace de Spotify</string>
+    <string name="search_hint">¿Qué querés escuchar?</string>
     <string name="login">Iniciar sesión con Spotify</string>
     <string name="login_note">Requiere Spotify Premium. Se abre el navegador una sola vez; después el teléfono recuerda la sesión.</string>
     <string name="logout">Cerrar sesión</string>
@@ -39,4 +39,11 @@
     <string name="like">Me gusta</string>
     <string name="close">Cerrar</string>
     <string name="now_playing">SONANDO</string>
+    <string name="nav_home">Inicio</string>
+    <string name="nav_search">Buscar</string>
+    <string name="nav_library">Tu biblioteca</string>
+    <string name="nav_create">Crear</string>
+    <string name="chip_playlists">Playlists</string>
+    <string name="chip_albums">Álbumes</string>
+    <string name="chip_artists">Artistas</string>
 </resources>

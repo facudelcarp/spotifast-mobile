@@ -47,7 +47,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
     private android.widget.EditText query;
     private Browser browser;
     private ImageButton like;
-    private TextView tabLibrary, tabSearch, tabQueue;
+    private ImageButton miniLike;
+    private View searchBar, chips;
+    private static final int TAB_HOME = 0, TAB_SEARCH = 1, TAB_LIBRARY = 2;
+    private int tab = -1;
+    private String libraryFilter = "playlists";
+    private int miniColor;
     private View mini, nowPlaying;
     private ImageView miniCover;
     private TextView miniTitle, miniArtist;
@@ -99,31 +104,65 @@ public final class MainActivity extends Activity implements EngineState.Observer
         browser = new Browser(this, (ListView) findViewById(R.id.list), empty,
                 (TextView) findViewById(R.id.page_title), findViewById(R.id.page_back));
         like = (ImageButton) findViewById(R.id.btn_like);
-        tabLibrary = (TextView) findViewById(R.id.tab_library);
-        tabSearch = (TextView) findViewById(R.id.tab_search);
-        tabQueue = (TextView) findViewById(R.id.tab_queue);
-        click(R.id.tab_library, new Runnable() {
+        miniLike = (ImageButton) findViewById(R.id.mini_like);
+        searchBar = findViewById(R.id.search_bar);
+        chips = findViewById(R.id.chips);
+        browser.setListener(new Browser.Listener() {
             @Override
-            public void run() {
-                showLibrary();
+            public void onSearchAgain(String q) {
+                query.setText(q);
+                query.setSelection(q.length());
             }
         });
-        click(R.id.tab_search, new Runnable() {
+        click(R.id.nav_home, new Runnable() {
             @Override
             public void run() {
-                selectTab(tabSearch);
+                showTab(TAB_HOME);
+            }
+        });
+        click(R.id.nav_search, new Runnable() {
+            @Override
+            public void run() {
+                showTab(TAB_SEARCH);
                 query.requestFocus();
                 InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
                 imm.showSoftInput(query, 0);
             }
         });
-        click(R.id.tab_queue, new Runnable() {
+        click(R.id.nav_library, new Runnable() {
             @Override
             public void run() {
-                if (EngineState.get().loggedIn) {
-                    selectTab(tabQueue);
-                    browser.showQueue();
+                showTab(TAB_LIBRARY);
+            }
+        });
+        click(R.id.nav_create, new Runnable() {
+            @Override
+            public void run() {
+                createPlaylist();
+            }
+        });
+        for (final String[] chip : new String[][]{{"playlists", ""}, {"albums", ""}, {"artists", ""}}) {
+            int id = "playlists".equals(chip[0]) ? R.id.chip_playlists
+                    : "albums".equals(chip[0]) ? R.id.chip_albums : R.id.chip_artists;
+            click(id, new Runnable() {
+                @Override
+                public void run() {
+                    libraryFilter = chip[0];
+                    showTab(TAB_LIBRARY);
                 }
+            });
+        }
+        click(R.id.mini_like, new Runnable() {
+            @Override
+            public void run() {
+                toggleLike();
+            }
+        });
+        click(R.id.np_queue, new Runnable() {
+            @Override
+            public void run() {
+                showNowPlaying(false);
+                browser.showQueue();
             }
         });
         mini = findViewById(R.id.mini);
@@ -164,7 +203,6 @@ public final class MainActivity extends Activity implements EngineState.Observer
                 ViewGroupCompat.square(cover, size);
             }
         });
-        selectTab(tabLibrary);
         click(R.id.btn_like, new Runnable() {
             @Override
             public void run() {
@@ -288,6 +326,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
     }
 
+    static final int DEMO_HOME = 0, DEMO_SEARCH = 1, DEMO_LIBRARY = 2;
+
+    void demoTab(int t) {
+        styleTab(t);
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -396,24 +440,101 @@ public final class MainActivity extends Activity implements EngineState.Observer
         if (!EngineState.get().loggedIn) {
             return;
         }
-        selectTab(tabSearch);
+        if (tab != TAB_SEARCH) {
+            showTab(TAB_SEARCH);
+        }
         browser.showSearch(q);
     }
 
-    private void showLibrary() {
+    /** Barra inferior: Inicio · Buscar · Tu biblioteca (como Spotify). */
+    private void showTab(int t) {
         if (!EngineState.get().loggedIn) {
             return;
         }
-        selectTab(tabLibrary);
-        browser.showLibrary();
+        showNowPlaying(false);
+        styleTab(t);
+        switch (t) {
+            case TAB_SEARCH:
+                browser.showSearchRoot();
+                break;
+            case TAB_LIBRARY:
+                browser.showLibrary(libraryFilter);
+                break;
+            default:
+                browser.showHome();
+        }
     }
 
-    private void selectTab(TextView tab) {
-        for (TextView t : new TextView[]{tabLibrary, tabSearch, tabQueue}) {
-            boolean on = t == tab;
-            t.setBackgroundResource(on ? R.drawable.tab_on : R.drawable.tab_off);
-            t.setTextColor(getResources().getColor(on ? R.color.bg : R.color.text));
+    /** Solo el aspecto de la barra inferior y los controles de cada pestaña. */
+    void styleTab(int t) {
+        tab = t;
+        searchBar.setVisibility(t == TAB_SEARCH ? View.VISIBLE : View.GONE);
+        chips.setVisibility(t == TAB_LIBRARY ? View.VISIBLE : View.GONE);
+        if (t != TAB_SEARCH) {
+            hideKeyboard();
         }
+        int[][] nav = {
+                {R.id.nav_home_icon, R.id.nav_home_label},
+                {R.id.nav_search_icon, R.id.nav_search_label},
+                {R.id.nav_library_icon, R.id.nav_library_label}};
+        for (int i = 0; i < nav.length; i++) {
+            int c = getResources().getColor(i == t ? R.color.text : R.color.muted);
+            ((ImageView) findViewById(nav[i][0])).setColorFilter(c);
+            ((TextView) findViewById(nav[i][1])).setTextColor(c);
+        }
+        int[] chipIds = {R.id.chip_playlists, R.id.chip_albums, R.id.chip_artists};
+        String[] keys = {"playlists", "albums", "artists"};
+        for (int i = 0; i < chipIds.length; i++) {
+            TextView c = (TextView) findViewById(chipIds[i]);
+            boolean on = keys[i].equals(libraryFilter);
+            c.setBackgroundResource(on ? R.drawable.tab_on : R.drawable.tab_off);
+            c.setTextColor(getResources().getColor(on ? R.color.bg : R.color.text));
+        }
+    }
+
+    /** Crear: nueva playlist (lo único de ese menú que la Web API permite). */
+    private void createPlaylist() {
+        if (!EngineState.get().loggedIn) {
+            return;
+        }
+        final android.widget.EditText name = new android.widget.EditText(this);
+        name.setHint("Mi playlist");
+        name.setSingleLine(true);
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Nueva playlist")
+                .setView(name)
+                .setPositiveButton("Crear", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        String n = name.getText().toString().trim();
+                        WebApi.get(MainActivity.this).createPlaylist(n.length() == 0 ? "Mi playlist" : n,
+                                new WebApi.Created() {
+                                    @Override
+                                    public void onCreated(WebApi.Item playlist, String error) {
+                                        if (playlist == null) {
+                                            Toast.makeText(MainActivity.this, error, Toast.LENGTH_LONG).show();
+                                            return;
+                                        }
+                                        showTab(TAB_LIBRARY);
+                                        browser.openPlaylist(playlist);
+                                    }
+                                });
+                    }
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    /** Tiñe el mini reproductor con el tono de la carátula (como Spotify). 0 = color neutro. */
+    private void tintMini(int color) {
+        if (color == miniColor && color != 0) {
+            return;
+        }
+        miniColor = color;
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setCornerRadius(8 * getResources().getDisplayMetrics().density);
+        bg.setColor(color == 0 ? getResources().getColor(R.color.panel_hi) : color);
+        mini.setBackgroundDrawable(bg);
     }
 
     /** Ayudante mínimo para centrar la carátula con un tamaño fijo. */
@@ -488,10 +609,12 @@ public final class MainActivity extends Activity implements EngineState.Observer
     }
 
     private void renderLike() {
-        like.setVisibility(liked == null ? View.INVISIBLE : View.VISIBLE);
         boolean on = Boolean.TRUE.equals(liked);
-        like.setImageResource(on ? R.drawable.ic_heart : R.drawable.ic_heart_outline);
-        like.setColorFilter(getResources().getColor(on ? R.color.accent : R.color.muted));
+        for (ImageButton b : new ImageButton[]{like, miniLike}) {
+            b.setVisibility(liked == null ? View.INVISIBLE : View.VISIBLE);
+            b.setImageResource(on ? R.drawable.ic_heart : R.drawable.ic_heart_outline);
+            b.setColorFilter(getResources().getColor(on ? R.color.accent : R.color.text));
+        }
     }
 
     // ------------------------------------------------------------------ render
@@ -499,7 +622,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
     @Override
     public void onStateChanged(EngineState s) {
         if (s.loggedIn && browser.isEmpty()) {
-            showLibrary(); // pantalla inicial al conectar
+            showTab(TAB_HOME); // pantalla inicial al conectar
         }
         if (!s.uri.equals(shownUri)) {
             shownUri = s.uri;
@@ -567,6 +690,7 @@ public final class MainActivity extends Activity implements EngineState.Observer
         }
         if (eco || s.coverSmall == null) {
             shownMiniCover = null;
+            tintMini(0);
             int p = (int) (12 * getResources().getDisplayMetrics().density);
             miniCover.setPadding(p, p, p, p);
             miniCover.setImageResource(R.drawable.ic_note);
@@ -575,7 +699,17 @@ public final class MainActivity extends Activity implements EngineState.Observer
             shownMiniCover = s.coverSmall;
             miniCover.setPadding(0, 0, 0, 0);
             miniCover.clearColorFilter();
-            CoverLoader.into(miniCover, s.coverSmall);
+            final String url = s.coverSmall;
+            miniCover.setImageDrawable(null);
+            CoverLoader.load(url, new CoverLoader.Cb() {
+                @Override
+                public void onBitmap(android.graphics.Bitmap b) {
+                    if (url.equals(shownMiniCover)) {
+                        miniCover.setImageBitmap(b);
+                        tintMini(CoverLoader.tone(b));
+                    }
+                }
+            });
         }
 
         updateClock(s);

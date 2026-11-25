@@ -6,5 +6,5 @@
     android:paddingTop="18dp"
     android:paddingBottom="6dp"
     android:textColor="@color/text"
-    android:textSize="18sp"
+    android:textSize="20sp"
     android:textStyle="bold" />

@@ -36,6 +36,8 @@ public final class EngineState implements NativeEngine.Listener {
     public String deviceName = "";
     public String status = "idle"; // idle | playing | paused | buffering
     public String uri = "";
+    /** Contexto (playlist/álbum/artista) que pidió reproducir la app; "" si no se sabe. */
+    public String contextUri = "";
     public String title = "";
     public String artist = "";
     public String album = "";

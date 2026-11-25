@@ -78,6 +78,34 @@ public final class Prefs {
         p.edit().putString("web_client_id", v).apply();
     }
 
+    /** Búsquedas recientes (máx. 10), guardadas solo en el teléfono. */
+    public java.util.List<String> searchHistory() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(p.getString("search_history", "[]"));
+            for (int i = 0; i < a.length(); i++) {
+                out.add(a.getString(i));
+            }
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    public void addSearch(String q) {
+        java.util.List<String> h = searchHistory();
+        h.remove(q);
+        h.add(0, q);
+        org.json.JSONArray a = new org.json.JSONArray();
+        for (int i = 0; i < h.size() && i < 10; i++) {
+            a.put(h.get(i));
+        }
+        p.edit().putString("search_history", a.toString()).apply();
+    }
+
+    public void clearSearches() {
+        p.edit().remove("search_history").apply();
+    }
+
     public int volume() {
         return p.getInt("volume", 70);
     }

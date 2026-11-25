@@ -10,7 +10,7 @@
     <string name="repeat">Repeat</string>
     <string name="library">Library</string>
     <string name="search">Search</string>
-    <string name="search_hint">Search or paste a Spotify link</string>
+    <string name="search_hint">What do you want to listen to?</string>
     <string name="login">Log in with Spotify</string>
     <string name="login_note">Requires Spotify Premium. The browser opens once; the phone remembers the session.</string>
     <string name="logout">Log out</string>
@@ -38,4 +38,11 @@
     <string name="like">Like</string>
     <string name="close">Close</string>
     <string name="now_playing">NOW PLAYING</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_library">Your library</string>
+    <string name="nav_create">Create</string>
+    <string name="chip_playlists">Playlists</string>
+    <string name="chip_albums">Albums</string>
+    <string name="chip_artists">Artists</string>
 </resources>
