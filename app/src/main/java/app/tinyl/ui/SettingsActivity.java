@@ -173,6 +173,8 @@ public final class SettingsActivity extends Activity {
         root.addView(about);
 
         ScrollView sv = new ScrollView(this);
+        // Android 15 dibuja de borde a borde: que el contenido no quede bajo las barras del sistema.
+        sv.setFitsSystemWindows(true);
         sv.addView(root);
         setContentView(sv);
     }

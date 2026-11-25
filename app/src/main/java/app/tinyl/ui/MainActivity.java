@@ -93,6 +93,9 @@ public final class MainActivity extends Activity implements EngineState.Observer
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         setContentView(R.layout.activity_main);
+        // Zonas seguras (Android 15 dibuja de borde a borde): cada capa se corre lo que tapan las barras.
+        EdgeToEdge.apply(this, findViewById(android.R.id.content),
+                findViewById(R.id.main_column), findViewById(R.id.now_playing), findViewById(R.id.lyrics_view));
         prefs = new Prefs(this);
         status = (TextView) findViewById(R.id.status);
         time = (TextView) findViewById(R.id.time);
